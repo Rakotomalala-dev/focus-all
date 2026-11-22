@@ -1,0 +1,30 @@
+{
+  "name": "@focus/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Presets partagés : ESLint (config plate), Prettier, tsconfig Node et React.",
+  "exports": {
+    ".": "./eslint-preset.js",
+    "./eslint-preset": "./eslint-preset.js",
+    "./prettier": "./prettier.js",
+    "./tsconfig.node.json": "./tsconfig.node.json",
+    "./tsconfig.react.json": "./tsconfig.react.json"
+  },
+  "files": [
+    "eslint-preset.js",
+    "prettier.js",
+    "tsconfig.node.json",
+    "tsconfig.react.json"
+  ],
+  "dependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.37.3",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "typescript-eslint": "^8.19.1"
+  },
+  "peerDependencies": {
+    "eslint": ">=9",
+    "typescript": ">=5.5"
+  }
+}

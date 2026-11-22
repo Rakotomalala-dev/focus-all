@@ -1,0 +1,47 @@
+{
+  "name": "focus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Focus — gestion de tâches et productivité. Monorepo pnpm + Turborepo.",
+  "license": "UNLICENSED",
+  "prettier": "@focus/config/prettier",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.12 <23",
+    "pnpm": ">=9 <10"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:api": "pnpm --filter @focus/api dev",
+    "dev:app": "pnpm --filter @focus/mobile dev",
+    "build": "turbo run build",
+    "build:api": "pnpm --filter @focus/api build",
+    "build:web": "pnpm --filter @focus/mobile build:web",
+    "lint": "turbo run lint",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "pnpm --filter @focus/api test:integration",
+    "test:e2e:web": "playwright test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "db:migrate": "pnpm --filter @focus/api db:migrate",
+    "db:deploy": "pnpm --filter @focus/api db:deploy",
+    "db:seed": "pnpm --filter @focus/api db:seed",
+    "db:reset": "pnpm --filter @focus/api db:reset",
+    "db:studio": "pnpm --filter @focus/api db:studio",
+    "api:openapi": "pnpm --filter @focus/api api:openapi",
+    "docker:up": "docker compose -f docker/compose.yml up -d",
+    "docker:down": "docker compose -f docker/compose.yml down",
+    "docker:reset": "docker compose -f docker/compose.yml down -v",
+    "docker:logs": "docker compose -f docker/compose.yml logs -f"
+  },
+  "devDependencies": {
+    "@focus/config": "workspace:*",
+    "@types/node": "^22.10.5",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3"
+  }
+}
