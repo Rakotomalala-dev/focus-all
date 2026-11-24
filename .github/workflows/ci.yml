@@ -32,8 +32,8 @@ jobs:
         uses: actions/checkout@v4
 
       # `.nvmrc` contient `22` : setup-node résout la dernière 22.x LTS. Hors de
-      # `engines`, Corepack échoue avant pnpm (message `AutoInstallFailed` peu
-      # explicite, mais échec certain) — un décalage ne peut pas passer.
+      # `engines`, `pnpm install` échoue en ERR_PNPM_UNSUPPORTED_ENGINE (via
+      # `engine-strict=true`) : un décalage de version ne peut pas passer.
       - name: Set up Node.js 22 LTS
         uses: actions/setup-node@v4
         with:
