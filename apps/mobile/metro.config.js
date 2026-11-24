@@ -13,7 +13,8 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
   path.resolve(workspaceRoot, "node_modules"),
 ];
-// Évite qu'une dépendance soit résolue deux fois (unespace pnpm non plat).
-config.resolver.disableHierarchicalLookup = true;
+// La résolution hiérarchique doit rester active : avec le layout pnpm isolé,
+// les dépendances internes d'expo-router vivent à côté de lui dans le store
+// virtuel (node_modules/.pnpm/...), hors de nodeModulesPaths.
 
 module.exports = config;

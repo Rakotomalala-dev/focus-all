@@ -5,7 +5,13 @@
 > **Public :** développeurs, DevOps, QA, agents IA contributeurs
 > **Documents liés :** [01-ARCHITECTURE.md](./01-ARCHITECTURE.md) · [02-CAHIER-DES-CHARGES.md](./02-CAHIER-DES-CHARGES.md) · [04-BEST-PRACTICES.md](./04-BEST-PRACTICES.md) · [05-SKILLS-AND-TOOLS.md](./05-SKILLS-AND-TOOLS.md)
 
-> **Avertissement d'état.** À la date de rédaction, le dépôt ne contient **aucun code applicatif** : uniquement `.gitignore` et ce dossier `docs/`. Tout ce qui suit décrit la procédure **cible** à mettre en place lors de la phase M0. Aucune commande ci-dessous n'a encore été exécutée avec succès sur ce dépôt ; elles sont spécifiées pour être implémentées puis validées.
+> **Avertissement d'état (2026-11-22).** Le socle **M0** est en place et commité (`806c3df`) : configuration racine (pnpm 9 + Turborepo, `tsconfig.base.json`, ESLint plat, Prettier, `.npmrc`, `.env.example`, `docker/compose.yml`), `packages/config`, squelette `apps/api` (Fastify, préfixe `/api/v1`, `GET /health` et `GET /health/ready`) et squelette `apps/mobile` (Expo SDK 52 + Expo Router, écran unique). Aucune logique métier n'existe encore : les sections §3 à §13 décrivent la procédure **cible** des phases suivantes (Prisma, Redis, authentification, sync, tests, déploiement) et restent à implémenter puis valider.
+>
+> Vérifications **réellement exécutées** sur ce dépôt : `pnpm install` (lockfile `9.0`), `pnpm typecheck` (2 tâches, code 0), `pnpm lint` (0 avertissement, code 0), `pnpm test` (1 fichier, 2 tests passés, code 0), `pnpm --filter @focus/api build` (code 0), API démarrée puis `GET /health` et `GET /health/ready` → `200` (`database`/`redis` = `not_configured`), et `pnpm --filter @focus/mobile build:web` → `Exported: dist`, 3 routes statiques, code 0.
+>
+> **Réalignement Node (2026-11-24).** Le poste de développement tourne désormais sous **Node 22.23.5** (nvm-windows 2.0.1, version `default`) et **pnpm 9.15.9** (via Corepack), donc dans la plage `engines` (`>=22.12 <23`, pnpm `>=9 <10`). Vérifications relancées **sans aucun `--config.engine-strict=false`**, `engine-strict=true` restant actif dans `.npmrc` : `pnpm install` → code `0` (lockfile à jour, `Done in 11.9s`, `+23 −61` paquets) ; `pnpm typecheck` → code `0` ; `pnpm lint` → code `0` ; `pnpm test` → code `0` (1 fichier, 2 tests) ; `pnpm build:web` → code `0` (`Exported: dist`, 3 routes statiques). Ces trois premiers contrôles étant revenus du cache Turborepo, ils ont été rejoués avec `turbo run typecheck lint test --force` (0 tâche en cache) → code `0`. L'état « Node 25 hors plage » décrit en §1.3 est donc **clos**.
+>
+> Limites connues : la **CI n'existe pas encore** (aucun workflow) ; `docker compose`, l'émulateur Android, le démarrage de Metro et l'ouverture réelle des pages exportées ne sont **pas** vérifiés ; l'installation de Node 22 a nécessité un miroir local (voir §1.3) car nvm 2.0.1 impose un délai de téléchargement de 30 s.
 
 ---
 
@@ -34,14 +40,14 @@
 | Maestro CLI | tests E2E mobile |
 | k6 | tests de charge |
 
-### 1.3 Écart constaté sur le poste de développement
+### 1.3 Réalignement du poste de développement (fait le 2026-11-24)
 
 ```text
-Constaté : Node v25.8.1, npm 11.11.0, pnpm absent, Bun absent.
-Requis   : Node 22 LTS, pnpm 9.
+Avant  : Node v25.8.1 (MSI global), npm 11.11.0, pnpm absent.
+Après  : Node v22.23.5 (nvm-windows 2.0.1, `default`), pnpm 9.15.9, npm 10.x.
 ```
 
-Node 25 n'est pas une version LTS et n'est pas supporté par les versions stables d'Expo/Nest au moment de la rédaction (doc 01, ADR-016). Procédure de réalignement :
+Node 25 n'est pas une version LTS et n'est pas supporté par les versions stables d'Expo/Nest au moment de la rédaction (doc 01, ADR-016). Procédure de référence :
 
 ```bash
 # Option A — nvm (macOS/Linux/WSL)
@@ -49,8 +55,8 @@ nvm install 22
 nvm use 22
 
 # Option B — nvm-windows
-nvm install 22.12.0
-nvm use 22.12.0
+nvm install 22
+nvm use 22
 
 # Activation de pnpm via Corepack (fourni avec Node)
 corepack enable
@@ -59,6 +65,18 @@ pnpm -v   # doit afficher 9.x
 ```
 
 Le fichier `.nvmrc` (`22`) et `engines` dans `package.json` verrouillent la contrainte ; `pnpm install` échoue volontairement si la version ne correspond pas (via `engine-strict=true` dans `.npmrc`).
+
+#### 1.3.1 Ce qui a réellement été fait sur le poste Windows
+
+| Étape | Détail |
+|---|---|
+| Désinstallation de Node 25 | MSI global retiré (`msiexec /x{…} /qn /norestart`, code `0`). nvm-windows exige que le répertoire de lien (`C:\Program Files\nodejs`) **ne soit pas** un répertoire physique occupant. |
+| nvm-windows 2.0.1 | Installeur **Inno Setup** : `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-` (`/S`, flag NSIS, est ignoré). Racine : `%LOCALAPPDATA%\Author Software\nvm`, `NVM_HOME` posé côté utilisateur. En 2.x, `NVM_SYMLINK` n'existe plus et il n'y a **pas** de sous-commande `nvm root`. |
+| `nvm install 22` | La 22 LTS courante est **22.23.5**. nvm 2.0.1 applique un **délai de 30 s** au téléchargement de l'archive : sur un lien lent, `nvm install` échoue avec `context deadline exceeded`. Contournement utilisé : téléchargement de l'archive officielle `node-v22.23.5-win-x64.7z` hors nvm, vérification du **SHA-256** contre `dist/v22.23.5/SHASUMS256.txt`, puis miroir local servi en HTTP et pointé par `nvm config set node_mirror=http://127.0.0.1:<port>/dist` + `allow_insecure_downloads=true`. |
+| Remise à l'état par défaut | Après installation : `nvm config set allow_insecure_downloads=false` et `node_mirror=https://nodejs.org/dist`. Aucun miroir ni flag d'insécurité ne reste actif. |
+| pnpm | Fourni par Corepack (`pnpm -v` → `9.15.9`, conforme à `packageManager`) : aucune installation globale hors Corepack. |
+
+Une version majeure hors plage reste un **blocage à signaler**, jamais à contourner : `engine-strict=true` doit rester actif. `--config.engine-strict=false` n'est **pas** une procédure de dépannage — uniquement un constat d'état historique, désormais clos.
 
 ---
 
@@ -74,7 +92,48 @@ pnpm install
 
 `pnpm install` exécute les `postinstall` utiles (génération du client Prisma). Sur Windows, si les scripts sont bloqués, utiliser `pnpm install --config.enable-pre-post-scripts=true` — mais la configuration recommandée est `pnpm-workspace.yaml` + scripts explicites, sans dépendre des postinstall.
 
-### 2.2 Services locaux
+### 2.2 Mode de résolution des dépendances (pnpm + Expo)
+
+Le `.npmrc` de la racine **doit** contenir `node-linker=hoisted` tant que l'application mobile reste sur **Expo SDK 52** :
+
+```ini
+# .npmrc
+engine-strict=true
+node-linker=hoisted
+```
+
+| Point | Détail |
+|---|---|
+| Contrainte amont | Expo ne supporte les **dépendances isolées** de pnpm qu'à partir du **SDK 54** (voir `docs.expo.dev/guides/monorepos`). Le projet cible le SDK 52 : le layout isolé, défaut de pnpm 9, est hors support. |
+| Symptôme si absent | `expo export --platform web` échoue en cascade : `Unable to resolve module @react-navigation/native`, puis `expo-font/build/server`, puis `@babel/runtime`. Avec le layout isolé, Metro ne cherche que dans `nodeModulesPaths` et ne voit pas les dépendances internes d'`expo-router`, situées à côté de lui dans `node_modules/.pnpm/`. |
+| Conséquence de `hoisted` | `node_modules` aplati à la racine (proche de npm) : perte de l'isolation stricte de pnpm. Les imports non déclarés redeviennent possibles — la revue de code reste responsable de la propreté des `dependencies`. |
+| `metro.config.js` | Ne **pas** activer `config.resolver.disableHierarchicalLookup = true` avec ce linker : la résolution hiérarchique doit rester disponible. `watchFolders` et `nodeModulesPaths` restent nécessaires pour les paquets `@focus/*` du monorepo. |
+| Changement de linker | Supprimer tous les `node_modules` (`rm -rf node_modules apps/*/node_modules packages/*/node_modules`) puis `pnpm install` : pnpm refuse de réutiliser une arborescence installée avec un autre linker. |
+| Retour au layout isolé | Envisageable seulement après migration vers Expo SDK 54+, à traiter comme une tâche dédiée (réinstallation complète + validation de `pnpm build:web`). |
+
+> **Correction d'une erreur de ce document.** La première version de cette annexe (§13.1) indiquait que `node-linker=hoisted` était « incompatible React Native ». C'est faux pour la combinaison retenue (React Native 0.76 / Expo SDK 52) : l'absence de ce réglage a bloqué l'export web du socle M0.
+
+#### 2.2.1 `query-string` déclaré par l'app mobile
+
+`expo-router` 4.0.x importe `query-string` à l'exécution (`build/fork/getPathFromState.js`) **sans le déclarer** dans ses `dependencies` : il comptait sur `@react-navigation/core`, dont la plage de versions a dérivé et ne le fournit plus. Le paquet doit donc être déclaré par l'application consommatrice :
+
+```jsonc
+// apps/mobile/package.json
+"dependencies": {
+  "query-string": "^7.1.3"
+}
+```
+
+| Règle | Détail |
+|---|---|
+| Version | **v7 obligatoire** (CJS). La v9 est ESM-only et casse le `require` interne d'`expo-router` (`TypeError: queryString.stringify is not a function`). |
+| Portée | Dépendance de `@focus/mobile` uniquement : ni l'API ni les `packages/*` ne l'utilisent. |
+| Durée de vie | À conserver tant qu'`expo-router` 4.x est installé ; à réévaluer lors de la montée de SDK (isolation pnpm supportée et correctif amont). |
+| Vérification | `pnpm --filter @focus/mobile build:web` doit produire les routes statiques `/`, `/_sitemap` et `/+not-found` dans `apps/mobile/dist/`, sans erreur de résolution Metro. |
+
+Constaté au déblocage de l'export M0 (2026-11-22, Node 25.8.1 hors plage `engines`) puis **revérifié sous Node 22.23.5 / pnpm 9.15.9** (2026-11-24, `engine-strict=true` actif) : `Exported: dist`, 3 routes statiques, bundle web de 912 kB, code de sortie `0`.
+
+### 2.3 Services locaux
 
 ```bash
 cp .env.example .env          # puis ajuster si nécessaire
@@ -97,7 +156,7 @@ docker compose -f docker/compose.yml ps
 # postgres, redis, minio, mailhog doivent être "running (healthy)"
 ```
 
-### 2.3 Base de données
+### 2.4 Base de données
 
 ```bash
 pnpm db:migrate      # applique les migrations Prisma
@@ -113,7 +172,7 @@ Le seed crée :
 
 > Ces identifiants sont **strictement locaux**. Le seed refuse de s'exécuter si `NODE_ENV=production`.
 
-### 2.4 Démarrage
+### 2.5 Démarrage
 
 ```bash
 pnpm dev          # API (4000) + Expo (8081) en parallèle via Turborepo
@@ -130,7 +189,7 @@ pnpm dev          # API (4000) + Expo (8081) en parallèle via Turborepo
 
 Dans Expo, `a` ouvre l'émulateur Android, `w` ouvre le web. Le client doit pointer sur l'API via `EXPO_PUBLIC_API_URL` ; sur émulateur Android, `localhost` désigne l'émulateur lui-même → utiliser `http://10.0.2.2:4000` (documenté dans `.env.example`).
 
-### 2.5 Vérification de l'installation
+### 2.6 Vérification de l'installation
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm test
@@ -561,6 +620,8 @@ pnpm build:web
 # à servir avec fallback SPA (toutes les routes -> index.html)
 ```
 
+L'export n'aboutit que si le mode de résolution de §2.2 est respecté (`node-linker=hoisted`) et si `query-string` est déclaré par l'app (§2.2.1) : sinon Metro échoue sur les dépendances internes d'`expo-router`. La sortie `web.output: "static"` génère une page HTML par route (`index.html`, `_sitemap.html`, `+not-found.html`) et un bundle unique dans `_expo/static/js/web/`.
+
 Le service worker (Workbox) met en cache le shell applicatif uniquement ; les données sont gérées par SQLite/`localStorage` applicatif, pas par le service worker (évite les incohérences de cache HTTP sur des données personnelles).
 
 ### 7.3 App desktop Tauri (V1.1)
@@ -754,6 +815,8 @@ Interdits dans les logs : tokens, mots de passe, corps de requête complet, e-ma
 | Symptôme | Cause probable | Solution |
 |---|---|---|
 | `pnpm install` échoue sur `engines` | Node ≠ 22 | `nvm use 22` |
+| `ERR_PNPM_UNSUPPORTED_ENGINE` sur toute commande | Node hors `>=22.12 <23` avec `engine-strict=true` | `nvm use 22` ; ne pas désactiver `engine-strict` durablement |
+| `Unable to resolve module …` pendant `expo export` / `expo start` | layout pnpm isolé (`node-linker` absent de `.npmrc`) ou `query-string` non déclaré | appliquer §2.2 et §2.2.1, supprimer `node_modules`, réinstaller |
 | Metro ne résout pas `@focus/contracts` | `watchFolders` mal configuré | vérifier `metro.config.js` (workspaces) |
 | `PrismaClientInitializationError` | Postgres non démarré | `pnpm docker:up` |
 | `P1001` connexion refusée | `DATABASE_URL` incorrecte / port occupé | `docker compose ps`, vérifier `.env` |
@@ -788,7 +851,7 @@ Interdits dans les logs : tokens, mots de passe, corps de requête complet, e-ma
 | `package.json` (racine) | scripts, `engines`, `packageManager` |
 | `pnpm-workspace.yaml` | espaces de travail |
 | `turbo.json` | graphe de tâches |
-| `.npmrc` | `engine-strict=true`, `node-linker=hoisted` **non** (incompatible RN) |
+| `.npmrc` | `engine-strict=true`, `node-linker=hoisted` (**requis** par Expo SDK 52 — voir §2.2) |
 | `.nvmrc` | `22` |
 | `.env.example` | toutes les variables, valeurs factices |
 | `tsconfig.base.json` | `strict`, `noUncheckedIndexedAccess`, `paths` |
