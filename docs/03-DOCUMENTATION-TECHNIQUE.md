@@ -277,6 +277,32 @@ Le paquet est compilé en `dist/` (CommonJS, `.d.ts`) : Turborepo garantit l'ord
 
 Règle de sécurité (N-7) : `detail` est **omis** sur les 5xx — le message interne part dans les logs avec le `requestId`, jamais dans la réponse.
 
+### 2.8 Endpoints tâches (repository en mémoire)
+
+Première feature verticale : `controller → service → repository`, avec validation par `taskDraftSchema` et sortie d'erreur par le filtre problem+json.
+
+| Méthode | Route | Corps / paramètres | Réponse |
+|---|---|---|---|
+| `POST` | `/api/v1/tasks` | `taskDraftSchema` (seul `title` est obligatoire) | `201` + `taskSchema` |
+| `GET` | `/api/v1/tasks` | `taskListQuerySchema` : `limit` (1-100, défaut 50), `cursor`, `status`, `projectId` | `200` + `{ items, nextCursor }` |
+| `GET` | `/api/v1/tasks/:id` | UUID dans le chemin | `200` + `taskSchema`, sinon `404 NOT_FOUND` / `400 VALIDATION_FAILED` |
+
+```bash
+curl -s -X POST http://localhost:4000/api/v1/tasks \
+  -H 'content-type: application/json' \
+  -d '{"title":"  Acheter du pain  ","priority":"HIGH"}'
+# 201 → titre rogné, status=TODO, version=0, completedAt=null, tagIds=[]
+```
+
+Propriétés importantes :
+
+- **Identifiants UUID v7** générés côté serveur (`src/common/uuid-v7.ts`) : ordonnés dans le temps, comme l'impose ADR-017.
+- **Pagination par curseur opaque** (`base64url` d'un offset) : aucun `offset` exposé au client ; un curseur forgé renvoie `400 VALIDATION_FAILED`.
+- **`workspaceId` serveur** (`DEV_WORKSPACE_ID`) : jamais lu depuis le corps ou la requête (N-3). À remplacer par le workspace de session dès que l'authentification arrive.
+- **Repository en mémoire** (`InMemoryTaskRepository`) : aucune persistance, données perdues au redémarrage. Il implémente le port `TaskRepository` ; passer à Prisma ne changera que le `useClass` du module.
+
+Tests : `tasks.service.spec.ts` (cas métier, pagination, erreurs) et `tasks.http.spec.ts` (vraie application Nest + Fastify sur un port éphémère, réponses validées par les schémas du contrat : états vide, contenu, erreur 400/404, pagination).
+
 ---
 
 ## 3. Structure du monorepo et commandes

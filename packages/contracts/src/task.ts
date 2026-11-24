@@ -66,3 +66,11 @@ export const taskListQuerySchema = pageQuerySchema.extend({
 });
 
 export type TaskListQuery = z.output<typeof taskListQuerySchema>;
+
+// Enveloppe de liste : `nextCursor` vaut `null` en fin de parcours, jamais `""`.
+export const taskListResponseSchema = z.object({
+  items: z.array(taskSchema),
+  nextCursor: z.string().min(1).nullable(),
+});
+
+export type TaskListResponse = z.output<typeof taskListResponseSchema>;
