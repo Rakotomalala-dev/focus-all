@@ -302,6 +302,7 @@ Propriétés importantes :
 - **Pagination par curseur *keyset*** : le curseur (`base64url`) transporte la **clé de tri** de la dernière tâche vue — `{ sortOrder, id }` —, jamais un rang. Si une tâche est créée ou déplacée entre deux pages, aucune tâche n'est sautée ni répétée. Un curseur illisible, incomplet ou portant un id non UUID renvoie `400 VALIDATION_FAILED`. La réponse porte `nextCursor: null` en fin de parcours.
 - **`workspaceId` serveur** (`DEV_WORKSPACE_ID`) : jamais lu depuis le corps ou la requête (N-3). À remplacer par le workspace de session dès que l'authentification arrive.
 - **Contrôle optimiste obligatoire** : `PATCH` et `DELETE` exigent la version attendue, sous forme de champ `version`, d'en-tête `If-Match` (`3`, `"3"` ou `W/"3"`) ou de query `version`. Sans elle : `400 VALIDATION_FAILED` — jamais d'écrasement silencieux. Si le corps porte une version **et** un `If-Match`, le corps gagne.
+- **En-têtes de version** : chaque `POST`, `GET /:id` et `PATCH` publie `ETag: "<version>"` ; `POST` renvoie aussi `Location: /api/v1/tasks/:id`. Le client renvoie l'`ETag` tel quel dans `If-Match`, sans relire `version` dans le corps.
 - **Statut en cas de version obsolète** — la tâche n'est jamais modifiée :
 
 | Provenance de la version | Statut HTTP | `code` | `title` |

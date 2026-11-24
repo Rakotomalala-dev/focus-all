@@ -18,6 +18,7 @@ let baseUrl = "";
 type HttpResult = {
   readonly status: number;
   readonly contentType: string | null;
+  readonly headers: Headers;
   readonly body: unknown;
 };
 
@@ -28,7 +29,12 @@ async function request(path: string, init?: RequestInit): Promise<HttpResult> {
   if (text.length > 0) {
     body = JSON.parse(text);
   }
-  return { status: response.status, contentType: response.headers.get("content-type"), body };
+  return {
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+    headers: response.headers,
+    body,
+  };
 }
 
 function postTask(payload: unknown): Promise<HttpResult> {
@@ -102,6 +108,34 @@ describe("état contenu", () => {
     expect(result.status).toBe(200);
     expect(taskSchema.parse(result.body).id).toBe(created.id);
   });
+
+  it("POST renvoie Location et un ETag égal à la version", async () => {
+    const result = await postTask({ title: "avec en-têtes" });
+    const task = taskSchema.parse(result.body);
+
+    expect(result.headers.get("location")).toBe(`/api/v1/tasks/${task.id}`);
+    expect(result.headers.get("etag")).toBe('"0"');
+  });
+
+  it("GET /:id publie la version en ETag, réutilisable telle quelle dans If-Match", async () => {
+    const created = taskSchema.parse((await postTask({ title: "etag" })).body);
+
+    const read = await request(`/api/v1/tasks/${created.id}`);
+    const etag = read.headers.get("etag");
+
+    expect(etag).toBe(`"${created.version}"`);
+
+    // La valeur de l'ETag, rejouée en If-Match, doit être acceptée.
+    const patched = await request(`/api/v1/tasks/${created.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "if-match": etag ?? "" },
+      body: JSON.stringify({ title: "via etag" }),
+    });
+
+    expect(patched.status).toBe(200);
+    expect(taskSchema.parse(patched.body).version).toBe(created.version + 1);
+    expect(patched.headers.get("etag")).toBe(`"${created.version + 1}"`);
+  });
 });
 
 describe("état erreur", () => {
@@ -145,29 +179,36 @@ describe("état erreur", () => {
 });
 
 describe("pagination par curseur", () => {
-  it("renvoie un nextCursor puis termine la liste", async () => {
+  it("parcourt toute la liste par pages, sans doublon ni oubli", async () => {
     await postTask({ title: "deuxième" });
     await postTask({ title: "troisième" });
 
-    const first = await request("/api/v1/tasks?limit=2");
-    const firstPage = parseList(first.body);
+    // Référence : la liste complète en une page. Le nombre de tâches créées par
+    // les autres cas du fichier peut varier, donc on ne le code pas en dur.
+    const all = parseList((await request("/api/v1/tasks?limit=100")).body);
+    expect(all.nextCursor).toBeNull();
+    expect(all.items.length).toBeGreaterThanOrEqual(4);
 
-    expect(first.status).toBe(200);
-    expect(firstPage.items).toHaveLength(2);
-    expect(typeof firstPage.nextCursor).toBe("string");
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 10; page += 1) {
+      const query = cursor === null ? "?limit=2" : `?limit=2&cursor=${encodeURIComponent(cursor)}`;
+      const result = await request(`/api/v1/tasks${query}`);
+      const parsed = parseList(result.body);
 
-    const cursor = firstPage.nextCursor ?? "";
-    const second = await request(`/api/v1/tasks?limit=2&cursor=${encodeURIComponent(cursor)}`);
-    const secondPage = parseList(second.body);
+      expect(result.status).toBe(200);
+      expect(parsed.items.length).toBeGreaterThan(0);
+      seen.push(...parsed.items.map((task) => task.id));
+      cursor = parsed.nextCursor;
+      if (cursor === null) {
+        break;
+      }
+    }
 
-    // 4 tâches existent à ce stade : deux pages de 2, la seconde terminant la
-    // liste. Les identifiants ne doivent pas se répéter d'une page à l'autre.
-    expect(second.status).toBe(200);
-    expect(secondPage.items).toHaveLength(2);
-    expect(secondPage.nextCursor).toBeNull();
-
-    const firstIds = new Set(firstPage.items.map((task) => task.id));
-    expect(secondPage.items.some((task) => firstIds.has(task.id))).toBe(false);
+    expect(cursor).toBeNull();
+    // Aucun doublon, puis exactement la même collection que la référence.
+    expect(new Set(seen).size).toBe(seen.length);
+    expect([...seen].sort()).toEqual(all.items.map((task) => task.id).sort());
   });
 
   it("garde le curseur valide quand une tâche est créée entre deux pages", async () => {

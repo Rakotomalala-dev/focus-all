@@ -18,6 +18,7 @@ let baseUrl = "";
 type HttpResult = {
   readonly status: number;
   readonly contentType: string | null;
+  readonly headers: Headers;
   readonly body: unknown;
 };
 
@@ -28,7 +29,12 @@ async function request(path: string, init?: RequestInit): Promise<HttpResult> {
   if (text.length > 0) {
     body = JSON.parse(text);
   }
-  return { status: response.status, contentType: response.headers.get("content-type"), body };
+  return {
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+    headers: response.headers,
+    body,
+  };
 }
 
 async function createTask(payload: unknown = { title: "tâche de test" }): Promise<Task> {
@@ -88,6 +94,15 @@ describe("PATCH /api/v1/tasks/:id", () => {
     expect(updated.version).toBe(1);
     // Un champ non fourni reste inchangé (PATCH partiel).
     expect(updated.status).toBe("TODO");
+  });
+
+  it("publie la nouvelle version en ETag pour enchaîner les écritures", async () => {
+    const created = await createTask();
+
+    const result = await patch(created.id, { title: "avec etag", version: 0 });
+
+    expect(result.status).toBe(200);
+    expect(result.headers.get("etag")).toBe('"1"');
   });
 
   it("horodate completedAt en passant à DONE, et l'efface en revenant en arrière", async () => {
