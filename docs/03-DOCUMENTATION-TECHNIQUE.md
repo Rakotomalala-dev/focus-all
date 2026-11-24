@@ -78,6 +78,46 @@ Le fichier `.nvmrc` (`22`) et `engines` dans `package.json` verrouillent la cont
 
 Une version majeure hors plage reste un **blocage à signaler**, jamais à contourner : `engine-strict=true` doit rester actif. `--config.engine-strict=false` n'est **pas** une procédure de dépannage — uniquement un constat d'état historique, désormais clos.
 
+#### 1.3.2 Contrôle automatique de l'environnement (`pnpm setup`)
+
+Avant tout `pnpm install` sur un poste neuf, lancer :
+
+```bash
+pnpm run setup
+```
+
+> **Ne pas taper `pnpm setup` sans `run`.** pnpm possède une commande **intégrée** du même nom, qui configure `PNPM_HOME` et modifie le `PATH` utilisateur — elle n'exécute pas ce script et n'affiche aucun contrôle. `pnpm run setup` appelle bien `scripts/setup.mjs` (vérifié : le builtin écrit `PNPM_HOME` dans `HKCU\Environment`, le script n'écrit rien).
+
+`scripts/setup.mjs` est **en lecture seule** : il n'installe rien et ne modifie aucun fichier. Il contrôle quatre points et sort en code `1` si l'un des deux premiers échoue.
+
+| Contrôle | Règle | En cas d'échec |
+|---|---|---|
+| Node | version courante contre `engines.node` (`>=22.12 <23`) | sortie `1` + rappel de `nvm use 22` |
+| pnpm | version **réellement résolue** contre `engines.pnpm` (`>=9 <10`) | sortie `1` + rappel de `corepack prepare pnpm@9 --activate` |
+| Résolution de pnpm | affiche le binaire trouvé (`where pnpm` / `which pnpm`) | avertit si `pnpm` passe par un shim nvm |
+| Docker | `docker` puis `docker compose version` | **avertissement seulement** : `docker compose` est requis pour Postgres/Redis/MinIO/MailHog (§2.3), pas pour coder |
+
+Le script n'analyse que la forme de plage utilisée par ce dépôt (`>=X.Y <Z`). Face à une autre forme, il affiche `warn` **« plage non reconnue »** au lieu de considérer la contrainte comme satisfaite : une plage non comprise ne doit jamais passer pour un succès.
+
+#### 1.3.3 Procédure nvm-windows, dans l'ordre (et ses pièges)
+
+1. **Désinstaller tout Node global** (MSI officiel, ou `winget`). nvm-windows ne peut pas poser son lien si `C:\Program Files\nodejs` (ou `%NODE_SYMLINK%`) est un répertoire physique. Contrôle : `node -v` doit échouer avant l'étape 3.
+2. **Installer nvm-windows** (2.0.1 au moment de la rédaction). L'installeur est en **Inno Setup** : `nvm-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-`. Le flag NSIS `/S` est ignoré et donne l'impression d'un blocage.
+3. **Installer Node** : `nvm install 22` puis `nvm use 22`, vérifié par `nvm list` (l'étoile doit être sur la 22) et `node -v`.
+4. **Exposer pnpm** : Node 22 fournit Corepack → `corepack enable`, puis `pnpm -v` (doit donner `9.15.9`, la version de `packageManager`). Aucune installation globale de pnpm.
+5. **Valider** : `pnpm run setup`, puis `pnpm install` (sans aucun `--config.engine-strict=false`).
+
+| Symptôme | Cause réelle | Solution |
+|---|---|---|
+| `FAILED v>=22.12 <23 : unknown alias …` puis `error: AutoInstallFailed`, y compris pour un simple `node -v` | **Shim de nvm 2.x**, pas Node ni pnpm : dans un dossier dont `package.json` déclare un `engines` (ou un `.nvmrc`) non satisfaisable, le shim intercepte `node` **et** `pnpm`, tente d'installer la version correspondante et échoue avant que Node ne démarre. Message sans rapport avec la vraie cause. | `nvm use 22`, ou vérifier `nvm list`. Pour contourner le shim et voir la vraie erreur : appeler directement `%NVM_HOME%\installs\v22.23.5\node.exe`. |
+| `ERR_PNPM_UNSUPPORTED_ENGINE` à `pnpm install` | Comportement **attendu** : c'est `engine-strict=true` qui refuse une version de Node hors `engines`. C'est ce message qu'on voit en CI (sans shim nvm). | `nvm use 22`. Ne jamais contourner avec `--config.engine-strict=false`. |
+| `pnpm` répond mais `pnpm setup` signale un binaire sous `%LOCALAPPDATA%\Author Software\nvm\.nodejs\pnpm` | Shim de nvm : c'est le Node **actif** qui répond, pas une installation indépendante. Après un `nvm use` dans un autre terminal, les shims peuvent pointer sur l'ancienne version. | Lancer `nvm use 22` **puis** `corepack enable` dans le même terminal, et revérifier avec `where pnpm`. |
+| `nvm install` échoue en `context deadline exceeded` | nvm 2.0.1 impose un **délai de 30 s** au téléchargement de l'archive Node. | Réseau lent : télécharger `node-v<version>-win-x64.7z` depuis `https://nodejs.org/dist/v<version>/`, **vérifier son SHA-256** contre `SHASUMS256.txt`, puis servir un miroir local et pointer `nvm config set node_mirror=…` (voir §1.3.1). Remettre `node_mirror` sur `https://nodejs.org/dist` et `allow_insecure_downloads=false` ensuite. |
+| nvm refuse de créer le lien vers `C:\Program Files\nodejs` | Un Node global est encore installé à cet emplacement. | Désinstaller ce Node (étape 1), supprimer le répertoire s'il subsiste, relancer l'installation nvm. |
+| `pnpm setup` affiche « Setup complete » et aucun contrôle | C'est le **builtin pnpm**, pas ce dépôt : il pose `PNPM_HOME` et modifie le `PATH` utilisateur. | Utiliser `pnpm run setup` (§1.3.2). Le builtin est sans danger mais n'effectue aucune vérification. |
+
+> Le miroir local de l'étape 3 est un **contournement de réseau**, pas une procédure normale : il ne doit jamais servir à installer une version hors plage `engines`, et la vérification SHA-256 n'est pas optionnelle.
+
 ---
 
 ## 2. Installation
