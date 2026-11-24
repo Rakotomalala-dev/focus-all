@@ -1,6 +1,10 @@
-import type { Task } from "@focus/contracts";
 import { describe, expect, it } from "vitest";
-import { InMemoryTaskRepository, isAfterCursor, type TaskCursor } from "./task.repository";
+import {
+  InMemoryTaskRepository,
+  isAfterCursor,
+  type StoredTask,
+  type TaskCursor,
+} from "./task.repository";
 
 const WORKSPACE = "018f3b3c-1a2b-7c3d-8e4f-0a1b2c3d4e5f";
 const TIMESTAMP = "2026-11-24T10:00:00.000Z";
@@ -10,7 +14,7 @@ const ID_B = "00000000-0000-7000-8000-00000000000b";
 const ID_C = "00000000-0000-7000-8000-00000000000c";
 const ID_D = "00000000-0000-7000-8000-00000000000d";
 
-function task(id: string, sortOrder: string): Task {
+function task(id: string, sortOrder: string): StoredTask {
   return {
     id,
     workspaceId: WORKSPACE,
@@ -26,7 +30,7 @@ function task(id: string, sortOrder: string): Task {
   };
 }
 
-const THREE_TASKS: readonly Task[] = [
+const THREE_TASKS: readonly StoredTask[] = [
   task(ID_A, "000001"),
   task(ID_B, "000002"),
   task(ID_C, "000003"),

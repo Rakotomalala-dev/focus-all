@@ -2,6 +2,19 @@ import { Injectable } from "@nestjs/common";
 import type { Task, TaskDraft, TaskPriority, TaskStatus } from "@focus/contracts";
 import { uuidV7 } from "../common/uuid-v7";
 
+// Entité stockée : le scope d'appartenance vit ici et nulle part ailleurs.
+// Il n'apparaît jamais dans une réponse HTTP (N-7), d'où la séparation avec
+// le type public `Task` du contrat.
+export type StoredTask = Task & { readonly workspaceId: string };
+
+// Retire le scope avant de rendre l'entité : la seule sortie autorisée est
+// `Task`, donc l'oubli devient une erreur de compilation, pas une fuite.
+function toTask(stored: StoredTask): Task {
+  const { workspaceId, ...task } = stored;
+  void workspaceId;
+  return task;
+}
+
 export type TaskFilters = {
   readonly status?: TaskStatus;
   readonly projectId?: string;
@@ -81,14 +94,14 @@ export function isAfterCursor(task: Task, cursor: TaskCursor): boolean {
 // Implémentation en mémoire : elle rend la feature testable sans PostgreSQL.
 @Injectable()
 export class InMemoryTaskRepository implements TaskRepository {
-  private readonly tasks = new Map<string, Task>();
+  private readonly tasks = new Map<string, StoredTask>();
   private sequence = 0;
 
   // Fabrique réservée aux tests : elle peuple une liste dont l'ordre est
   // connu (insertion avant le curseur, clés de tri égales). Le constructeur
   // doit rester sans paramètre, sinon Nest tente d'injecter `Array`
   // (`design:paramtypes`) et refuse de démarrer l'application.
-  static withTasks(seed: readonly Task[]): InMemoryTaskRepository {
+  static withTasks(seed: readonly StoredTask[]): InMemoryTaskRepository {
     const repository = new InMemoryTaskRepository();
     for (const task of seed) {
       repository.tasks.set(task.id, task);
@@ -101,7 +114,7 @@ export class InMemoryTaskRepository implements TaskRepository {
     const now = new Date().toISOString();
     this.sequence += 1;
 
-    const task: Task = {
+    const task: StoredTask = {
       id: uuidV7(),
       workspaceId,
       title: draft.title,
@@ -120,14 +133,14 @@ export class InMemoryTaskRepository implements TaskRepository {
     };
 
     this.tasks.set(task.id, task);
-    return task;
+    return toTask(task);
   }
 
   async findById(id: string, workspaceId: string): Promise<Task | undefined> {
     const task = this.tasks.get(id);
     // Scope par workspace systématique (N-3) : une tâche d'un autre workspace
     // est indistinguable d'une tâche absente.
-    return task !== undefined && task.workspaceId === workspaceId ? task : undefined;
+    return task !== undefined && task.workspaceId === workspaceId ? toTask(task) : undefined;
   }
 
   async update(
@@ -162,7 +175,7 @@ export class InMemoryTaskRepository implements TaskRepository {
     const projectId = patch.projectId ?? existing.projectId;
     const dueDate = patch.dueDate ?? existing.dueDate;
 
-    const next: Task = {
+    const next: StoredTask = {
       id: existing.id,
       workspaceId: existing.workspaceId,
       title: patch.title ?? existing.title,
@@ -180,7 +193,7 @@ export class InMemoryTaskRepository implements TaskRepository {
     };
 
     this.tasks.set(id, next);
-    return { status: "ok", task: next };
+    return { status: "ok", task: toTask(next) };
   }
 
   async remove(id: string, workspaceId: string, expectedVersion: number): Promise<MutationResult> {
@@ -193,7 +206,7 @@ export class InMemoryTaskRepository implements TaskRepository {
     }
 
     this.tasks.delete(id);
-    return { status: "ok", task: existing };
+    return { status: "ok", task: toTask(existing) };
   }
 
   async list(filters: TaskFilters, workspaceId: string, page: TaskPage): Promise<TaskPageResult> {
@@ -209,7 +222,7 @@ export class InMemoryTaskRepository implements TaskRepository {
     const window = matching.slice(0, page.limit + 1);
 
     return {
-      items: window.slice(0, page.limit),
+      items: window.slice(0, page.limit).map(toTask),
       hasMore: window.length > page.limit,
     };
   }

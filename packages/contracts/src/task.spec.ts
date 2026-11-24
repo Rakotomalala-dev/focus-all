@@ -53,6 +53,12 @@ describe("taskSchema", () => {
     expect(parsed.completedAt).toBeNull();
   });
 
+  it("n'expose pas le workspace, même si le serveur le reçoit (N-3/N-7)", () => {
+    const parsed = taskSchema.parse({ ...task, workspaceId: WORKSPACE_ID });
+
+    expect(parsed).not.toHaveProperty("workspaceId");
+  });
+
   it("refuse une version négative", () => {
     expect(taskSchema.safeParse({ ...task, version: -1 }).success).toBe(false);
   });

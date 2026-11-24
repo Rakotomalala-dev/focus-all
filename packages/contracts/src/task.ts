@@ -39,9 +39,10 @@ export type TaskDraft = z.output<typeof taskDraftSchema>;
 
 // Entité telle que renvoyée par l'API : `version` sert au contrôle optimiste
 // (If-Match / 409 CONFLICT_VERSION), `sortOrder` au réordonnancement manuel.
+// Le workspace d'appartenance reste interne au serveur (N-3/N-7) : il n'est
+// ni utile au client ni exposable, donc il n'apparaît pas dans le contrat.
 export const taskSchema = taskDraftSchema.extend({
   id: uuidSchema,
-  workspaceId: uuidSchema,
   status: taskStatusSchema,
   completedAt: isoDateTimeSchema.nullable(),
   sortOrder: z.string().min(1),
