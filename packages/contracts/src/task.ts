@@ -67,6 +67,29 @@ export const taskListQuerySchema = pageQuerySchema.extend({
 
 export type TaskListQuery = z.output<typeof taskListQuerySchema>;
 
+// Mise à jour partielle (PATCH) : tous les champs sont optionnels, y compris
+// `version` qui peut venir de l'en-tête `If-Match` à la place du corps.
+export const taskUpdateSchema = z.object({
+  title: taskTitleSchema.optional(),
+  description: z.string().max(MAX_TASK_DESCRIPTION_LENGTH).optional(),
+  projectId: uuidSchema.optional(),
+  dueDate: isoDateSchema.optional(),
+  priority: taskPrioritySchema.optional(),
+  tagIds: z.array(uuidSchema).max(MAX_TASK_TAGS).optional(),
+  status: taskStatusSchema.optional(),
+  // Version attendue par le client : contrôle optimiste (409 CONFLICT_VERSION).
+  version: z.number().int().nonnegative().optional(),
+});
+
+export type TaskUpdate = z.output<typeof taskUpdateSchema>;
+
+// Suppression : la version attendue peut venir de `?version=` ou d'`If-Match`.
+export const versionQuerySchema = z.object({
+  version: z.coerce.number().int().nonnegative().optional(),
+});
+
+export type VersionQuery = z.output<typeof versionQuerySchema>;
+
 // Enveloppe de liste : `nextCursor` vaut `null` en fin de parcours, jamais `""`.
 export const taskListResponseSchema = z.object({
   items: z.array(taskSchema),

@@ -286,6 +286,8 @@ Première feature verticale : `controller → service → repository`, avec vali
 | `POST` | `/api/v1/tasks` | `taskDraftSchema` (seul `title` est obligatoire) | `201` + `taskSchema` |
 | `GET` | `/api/v1/tasks` | `taskListQuerySchema` : `limit` (1-100, défaut 50), `cursor`, `status`, `projectId` | `200` + `{ items, nextCursor }` |
 | `GET` | `/api/v1/tasks/:id` | UUID dans le chemin | `200` + `taskSchema`, sinon `404 NOT_FOUND` / `400 VALIDATION_FAILED` |
+| `PATCH` | `/api/v1/tasks/:id` | `taskUpdateSchema` (tout optionnel) + `version` dans le corps **ou** `If-Match` | `200` + `taskSchema` (version incrémentée), `409 CONFLICT_VERSION` si la version ne correspond plus |
+| `DELETE` | `/api/v1/tasks/:id` | `?version=` **ou** `If-Match` | `204` sans corps, `409 CONFLICT_VERSION` si la version ne correspond plus |
 
 ```bash
 curl -s -X POST http://localhost:4000/api/v1/tasks \
@@ -299,7 +301,9 @@ Propriétés importantes :
 - **Identifiants UUID v7** générés côté serveur (`src/common/uuid-v7.ts`) : ordonnés dans le temps, comme l'impose ADR-017.
 - **Pagination par curseur *keyset*** : le curseur (`base64url`) transporte la **clé de tri** de la dernière tâche vue — `{ sortOrder, id }` —, jamais un rang. Si une tâche est créée ou déplacée entre deux pages, aucune tâche n'est sautée ni répétée. Un curseur illisible, incomplet ou portant un id non UUID renvoie `400 VALIDATION_FAILED`. La réponse porte `nextCursor: null` en fin de parcours.
 - **`workspaceId` serveur** (`DEV_WORKSPACE_ID`) : jamais lu depuis le corps ou la requête (N-3). À remplacer par le workspace de session dès que l'authentification arrive.
-- **Repository en mémoire** (`InMemoryTaskRepository`) : aucune persistance, données perdues au redémarrage. Il implémente le port `TaskRepository` ; passer à Prisma ne changera que le `useClass` du module.
+- **Contrôle optimiste obligatoire** : `PATCH` et `DELETE` exigent la version attendue, sous forme de champ `version`, d'en-tête `If-Match` (`3`, `"3"` ou `W/"3"`) ou de query `version`. Sans elle : `400 VALIDATION_FAILED` — jamais d'écrasement silencieux. Version obsolète : `409 CONFLICT_VERSION`, la tâche restant intacte.
+- **Complétion** : passer à `DONE` horodate `completedAt` une seule fois ; revenir à un autre statut l'efface (doc 02, RF tâches).
+- **Repository en mémoire** (`InMemoryTaskRepository`) : aucune persistance, données perdues au redémarrage, suppression physique. Il implémente le port `TaskRepository` ; passer à Prisma ne changera que le `useClass` du module (et introduira la suppression logique et la transaction du `SyncChange`).
 
 Tests : `tasks.service.spec.ts` (cas métier, pagination, erreurs) et `tasks.http.spec.ts` (vraie application Nest + Fastify sur un port éphémère, réponses validées par les schémas du contrat : états vide, contenu, erreur 400/404, pagination).
 

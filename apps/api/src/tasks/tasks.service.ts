@@ -1,16 +1,26 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   taskDraftSchema,
   taskListQuerySchema,
+  taskUpdateSchema,
   uuidSchema,
+  versionQuerySchema,
   type Task,
   type TaskListResponse,
 } from "@focus/contracts";
 import { DEV_WORKSPACE_ID } from "./dev-workspace";
 import {
   TASK_REPOSITORY,
+  type MutationResult,
   type TaskCursor,
   type TaskFilters,
+  type TaskPatch,
   type TaskRepository,
 } from "./task.repository";
 
@@ -36,6 +46,37 @@ export function encodeCursor(task: Task): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+// `If-Match` accepte `3`, `"3"` et `W/"3"` : la comparaison se fait sur la
+// version numérique, jamais sur la forme de l'en-tête.
+function parseIfMatch(ifMatch: string | undefined): number | undefined {
+  if (ifMatch === undefined) {
+    return undefined;
+  }
+  const match = /^(?:W\/)?"?([0-9]+)"?$/.exec(ifMatch.trim());
+  if (match === null) {
+    throw new BadRequestException([
+      'If-Match: en-tête invalide, version numérique attendue (ex. "3")',
+    ]);
+  }
+  return Number(match[1]);
+}
+
+// La version attendue peut venir du corps, de l'en-tête `If-Match` ou de la
+// query ; sans elle, aucun contrôle optimiste n'est possible → 400 (jamais un
+// écrasement silencieux).
+function resolveExpectedVersion(
+  fromPayload: number | undefined,
+  ifMatch: string | undefined,
+): number {
+  const version = fromPayload ?? parseIfMatch(ifMatch);
+  if (version === undefined) {
+    throw new BadRequestException([
+      "version: version attendue absente (champ `version`, en-tête If-Match ou query `version`)",
+    ]);
+  }
+  return version;
 }
 
 function decodeCursor(cursor: string): TaskCursor {
@@ -73,15 +114,72 @@ export class TasksService {
   }
 
   async findById(rawId: string): Promise<Task> {
-    const parsedId = uuidSchema.safeParse(rawId);
-    if (!parsedId.success) {
-      throw new BadRequestException(["id: identifiant invalide"]);
-    }
-    const task = await this.tasks.findById(parsedId.data, DEV_WORKSPACE_ID);
+    const id = this.parseId(rawId);
+    const task = await this.tasks.findById(id, DEV_WORKSPACE_ID);
     if (task === undefined) {
       throw new NotFoundException("Tâche introuvable");
     }
     return task;
+  }
+
+  private parseId(rawId: string): string {
+    const parsedId = uuidSchema.safeParse(rawId);
+    if (!parsedId.success) {
+      throw new BadRequestException(["id: identifiant invalide"]);
+    }
+    return parsedId.data;
+  }
+
+  private applyMutation(result: MutationResult): Task {
+    if (result.status === "not_found") {
+      throw new NotFoundException("Tâche introuvable");
+    }
+    if (result.status === "conflict") {
+      throw new ConflictException(
+        `version: version attendue obsolète, version courante ${result.currentVersion}`,
+      );
+    }
+    return result.task;
+  }
+
+  async update(rawId: string, rawBody: unknown, ifMatch: string | undefined): Promise<Task> {
+    const id = this.parseId(rawId);
+    const parsed = taskUpdateSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      throw new BadRequestException(describeIssues(parsed.error.issues));
+    }
+
+    const { version, ...fields } = parsed.data;
+    const expectedVersion = resolveExpectedVersion(version, ifMatch);
+    // `exactOptionalPropertyTypes` : chaque clé absente est omise du patch.
+    const patch: TaskPatch = {
+      ...(fields.title === undefined ? {} : { title: fields.title }),
+      ...(fields.description === undefined ? {} : { description: fields.description }),
+      ...(fields.projectId === undefined ? {} : { projectId: fields.projectId }),
+      ...(fields.dueDate === undefined ? {} : { dueDate: fields.dueDate }),
+      ...(fields.priority === undefined ? {} : { priority: fields.priority }),
+      ...(fields.tagIds === undefined ? {} : { tagIds: fields.tagIds }),
+      ...(fields.status === undefined ? {} : { status: fields.status }),
+    };
+
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestException(["body: aucun champ à modifier"]);
+    }
+
+    return this.applyMutation(
+      await this.tasks.update(id, DEV_WORKSPACE_ID, patch, expectedVersion),
+    );
+  }
+
+  async remove(rawId: string, rawQuery: unknown, ifMatch: string | undefined): Promise<void> {
+    const id = this.parseId(rawId);
+    const parsed = versionQuerySchema.safeParse(rawQuery);
+    if (!parsed.success) {
+      throw new BadRequestException(describeIssues(parsed.error.issues));
+    }
+
+    const expectedVersion = resolveExpectedVersion(parsed.data.version, ifMatch);
+    this.applyMutation(await this.tasks.remove(id, DEV_WORKSPACE_ID, expectedVersion));
   }
 
   async list(rawQuery: unknown): Promise<TaskListResponse> {

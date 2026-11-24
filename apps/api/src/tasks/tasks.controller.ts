@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Inject, Param, Post, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
 import type { Task, TaskListResponse } from "@focus/contracts";
 import { TasksService } from "./tasks.service";
 
@@ -22,5 +34,26 @@ export class TasksController {
   @Get(":id")
   findById(@Param("id") id: string): Promise<Task> {
     return this.tasks.findById(id);
+  }
+
+  // La version attendue peut venir du corps (`version`) ou d'`If-Match`.
+  @Patch(":id")
+  update(
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Headers("if-match") ifMatch: string | undefined,
+  ): Promise<Task> {
+    return this.tasks.update(id, body, ifMatch);
+  }
+
+  // 204 sans corps : rien à renvoyer, et pas de fuite de l'entité supprimée.
+  @Delete(":id")
+  @HttpCode(204)
+  async remove(
+    @Param("id") id: string,
+    @Query() query: unknown,
+    @Headers("if-match") ifMatch: string | undefined,
+  ): Promise<void> {
+    await this.tasks.remove(id, query, ifMatch);
   }
 }

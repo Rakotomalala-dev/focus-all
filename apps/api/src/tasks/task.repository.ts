@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { Task, TaskDraft, TaskStatus } from "@focus/contracts";
+import type { Task, TaskDraft, TaskPriority, TaskStatus } from "@focus/contracts";
 import { uuidV7 } from "../common/uuid-v7";
 
 export type TaskFilters = {
@@ -24,12 +24,37 @@ export type TaskPageResult = {
   readonly hasMore: boolean;
 };
 
+// Champs modifiables : la clé absente ne change rien (PATCH partiel).
+export type TaskPatch = {
+  readonly title?: string;
+  readonly description?: string;
+  readonly projectId?: string;
+  readonly dueDate?: string;
+  readonly priority?: TaskPriority;
+  readonly tagIds?: readonly string[];
+  readonly status?: TaskStatus;
+};
+
+// Résultat explicite d'une mutation : le service traduit `conflict` en 409
+// plutôt que de deviner à partir d'une valeur nulle.
+export type MutationResult =
+  | { readonly status: "ok"; readonly task: Task }
+  | { readonly status: "not_found" }
+  | { readonly status: "conflict"; readonly currentVersion: number };
+
 // Port du repository (N-1/N-2) : le service ne connaît ni Prisma ni le stockage.
 // Le remplacement par un repository Prisma se fera sans toucher au service.
 export interface TaskRepository {
   create(draft: TaskDraft, workspaceId: string): Promise<Task>;
   findById(id: string, workspaceId: string): Promise<Task | undefined>;
   list(filters: TaskFilters, workspaceId: string, page: TaskPage): Promise<TaskPageResult>;
+  update(
+    id: string,
+    workspaceId: string,
+    patch: TaskPatch,
+    expectedVersion: number,
+  ): Promise<MutationResult>;
+  remove(id: string, workspaceId: string, expectedVersion: number): Promise<MutationResult>;
 }
 
 export const TASK_REPOSITORY = "TASK_REPOSITORY";
@@ -103,6 +128,72 @@ export class InMemoryTaskRepository implements TaskRepository {
     // Scope par workspace systématique (N-3) : une tâche d'un autre workspace
     // est indistinguable d'une tâche absente.
     return task !== undefined && task.workspaceId === workspaceId ? task : undefined;
+  }
+
+  async update(
+    id: string,
+    workspaceId: string,
+    patch: TaskPatch,
+    expectedVersion: number,
+  ): Promise<MutationResult> {
+    const existing = this.tasks.get(id);
+    if (existing === undefined || existing.workspaceId !== workspaceId) {
+      return { status: "not_found" };
+    }
+    if (existing.version !== expectedVersion) {
+      return { status: "conflict", currentVersion: existing.version };
+    }
+
+    const now = new Date().toISOString();
+    // Le passage à DONE horodate la complétion ; en sortir l'efface
+    // (doc 02, RF tâches). La règle vit ici car le repository détient l'entité.
+    const completedAt =
+      patch.status === undefined
+        ? existing.completedAt
+        : patch.status === "DONE"
+          ? (existing.completedAt ?? now)
+          : null;
+
+    // Chaque champ requis est réassigné explicitement : étaler un `TaskPatch`
+    // dont les clés sont optionnelles rendrait `next` non assignable à `Task`.
+    // Les champs optionnels sont ajoutés seulement quand ils ont une valeur
+    // (`exactOptionalPropertyTypes` interdit de les mettre à `undefined`).
+    const description = patch.description ?? existing.description;
+    const projectId = patch.projectId ?? existing.projectId;
+    const dueDate = patch.dueDate ?? existing.dueDate;
+
+    const next: Task = {
+      id: existing.id,
+      workspaceId: existing.workspaceId,
+      title: patch.title ?? existing.title,
+      priority: patch.priority ?? existing.priority,
+      status: patch.status ?? existing.status,
+      sortOrder: existing.sortOrder,
+      version: existing.version + 1,
+      completedAt,
+      createdAt: existing.createdAt,
+      updatedAt: now,
+      tagIds: patch.tagIds === undefined ? existing.tagIds : [...patch.tagIds],
+      ...(description === undefined ? {} : { description }),
+      ...(projectId === undefined ? {} : { projectId }),
+      ...(dueDate === undefined ? {} : { dueDate }),
+    };
+
+    this.tasks.set(id, next);
+    return { status: "ok", task: next };
+  }
+
+  async remove(id: string, workspaceId: string, expectedVersion: number): Promise<MutationResult> {
+    const existing = this.tasks.get(id);
+    if (existing === undefined || existing.workspaceId !== workspaceId) {
+      return { status: "not_found" };
+    }
+    if (existing.version !== expectedVersion) {
+      return { status: "conflict", currentVersion: existing.version };
+    }
+
+    this.tasks.delete(id);
+    return { status: "ok", task: existing };
   }
 
   async list(filters: TaskFilters, workspaceId: string, page: TaskPage): Promise<TaskPageResult> {
