@@ -14,6 +14,13 @@ export const problemDetailsSchema = z.object({
   instance: z.string().min(1).optional(),
   code: errorCodeSchema,
   requestId: z.string().min(1).optional(),
+  // Clé i18n stable : le client traduit et formule le message, le serveur
+  // n'envoie jamais de phrase (AGENTS §2). Une erreur du domaine porte une clé,
+  // une 5xx n'en porte pas (`detail` reste réservé au diagnostic).
+  messageKey: z.string().min(1).optional(),
+  // Paramètres de la clé (`currentVersion`, `field`…), typés côté serveur :
+  // sans eux, le client ne peut pas rendre « la version courante est 3 ».
+  params: z.record(z.union([z.string(), z.number()])).optional(),
 });
 
 export type ProblemDetails = z.infer<typeof problemDetailsSchema>;

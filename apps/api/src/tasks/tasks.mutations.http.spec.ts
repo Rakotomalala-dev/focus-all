@@ -127,7 +127,10 @@ describe("PATCH /api/v1/tasks/:id", () => {
 
     expect(result.status).toBe(409);
     expect(result.contentType).toContain("application/problem+json");
-    expect(problemDetailsSchema.parse(result.body).code).toBe("CONFLICT_VERSION");
+    const problem = problemDetailsSchema.parse(result.body);
+    expect(problem.code).toBe("CONFLICT_VERSION");
+    expect(problem.messageKey).toBe("task.version_mismatch");
+    expect(problem.detail).toBeUndefined();
   });
 
   it("accepte la version via If-Match quand le corps n'en porte pas", async () => {
@@ -150,7 +153,8 @@ describe("PATCH /api/v1/tasks/:id", () => {
     const problem = problemDetailsSchema.parse(result.body);
     expect(problem.code).toBe("CONFLICT_VERSION");
     expect(problem.title).toBe("Precondition Failed");
-    expect(problem.detail).toContain("version courante 1");
+    expect(problem.messageKey).toBe("task.version_precondition_failed");
+    expect(problem.params).toEqual({ currentVersion: 1 });
   });
 
   it("refuse une requête sans version en 400 VALIDATION_FAILED", async () => {
@@ -215,7 +219,9 @@ describe("DELETE /api/v1/tasks/:id", () => {
     const result = await remove(created.id, 0);
 
     expect(result.status).toBe(409);
-    expect(problemDetailsSchema.parse(result.body).code).toBe("CONFLICT_VERSION");
+    const problem = problemDetailsSchema.parse(result.body);
+    expect(problem.code).toBe("CONFLICT_VERSION");
+    expect(problem.messageKey).toBe("task.version_mismatch");
     expect((await request(`/api/v1/tasks/${created.id}`)).status).toBe(200);
   });
 
@@ -229,6 +235,7 @@ describe("DELETE /api/v1/tasks/:id", () => {
     const problem = problemDetailsSchema.parse(result.body);
     expect(problem.code).toBe("CONFLICT_VERSION");
     expect(problem.title).toBe("Precondition Failed");
+    expect(problem.messageKey).toBe("task.version_precondition_failed");
     expect((await request(`/api/v1/tasks/${created.id}`)).status).toBe(200);
   });
 

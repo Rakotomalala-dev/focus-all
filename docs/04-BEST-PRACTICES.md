@@ -112,22 +112,24 @@ Une feature **n'importe pas** les fichiers internes d'une autre feature ; elle p
 ### 3.3 Gestion des erreurs
 
 ```ts
-// Domaine : erreur typée, jamais de string jetée
-export class DomainError extends Error {
+// Domaine : clé + paramètres typés ; `code` et `status` viennent d'un catalogue
+// indexé par la clé, pour qu'un même cas ne sorte pas avec deux statuts.
+export class DomainError<K extends DomainErrorKey = DomainErrorKey> extends Error {
+  readonly code: ErrorCode;
+  readonly status: number;
   constructor(
-    readonly code: ErrorCode,
-    readonly status: number,
-    message: string,
-    readonly details?: Record<string, unknown>,
+    readonly messageKey: K,
+    readonly params?: DomainErrorParams[K],
   ) {
-    super(message);
+    super(messageKey); // `message` sert aux logs, jamais à l'utilisateur
     this.name = "DomainError";
+    // … `code` et `status` lus dans le catalogue indexé par `messageKey`
   }
 }
 
 // Service : on lève du domaine, on ne construit pas de réponse HTTP
 if (task.version !== input.baseVersion) {
-  throw new DomainError("CONFLICT_VERSION", 409, "task.version_mismatch", { current: task.version });
+  throw new DomainError("task.version_mismatch", { currentVersion: task.version });
 }
 
 // Controller : la traduction HTTP est centralisée dans un filtre

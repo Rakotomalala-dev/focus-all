@@ -1,12 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  HttpException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import {
   taskDraftSchema,
   taskListQuerySchema,
@@ -16,6 +8,7 @@ import {
   type Task,
   type TaskListResponse,
 } from "@focus/contracts";
+import { DomainError } from "../common/domain-error";
 import { DEV_WORKSPACE_ID } from "./dev-workspace";
 import {
   TASK_REPOSITORY,
@@ -28,8 +21,9 @@ import {
 
 type Issue = { readonly path: readonly (string | number)[]; readonly message: string };
 
-// Les erreurs de Zod deviennent un `detail` lisible ; le filtre global les
-// transforme en 400 `VALIDATION_FAILED` au format problem+json.
+// Les erreurs de Zod deviennent un `detail` lisible (diagnostic d'entrée) ; le
+// filtre global les transforme en 400 `VALIDATION_FAILED`. Les refus métier, eux,
+// passent par `DomainError` : clé i18n, jamais de phrase (AGENTS §2).
 export function describeIssues(issues: readonly Issue[]): string[] {
   return issues.map((issue) => {
     const path = issue.path.join(".");
@@ -58,9 +52,7 @@ function parseIfMatch(ifMatch: string | undefined): number | undefined {
   }
   const match = /^(?:W\/)?"?([0-9]+)"?$/.exec(ifMatch.trim());
   if (match === null) {
-    throw new BadRequestException([
-      'If-Match: en-tête invalide, version numérique attendue (ex. "3")',
-    ]);
+    throw new DomainError("request.invalid_field", { field: "If-Match" });
   }
   return Number(match[1]);
 }
@@ -88,13 +80,11 @@ function resolveExpectedVersion(
   if (fromHeader !== undefined) {
     return { version: fromHeader, source: "if-match" };
   }
-  throw new BadRequestException([
-    "version: version attendue absente (champ `version`, en-tête If-Match ou query `version`)",
-  ]);
+  throw new DomainError("request.missing_version");
 }
 
 function decodeCursor(cursor: string): TaskCursor {
-  const invalid = new BadRequestException(["cursor: curseur invalide"]);
+  const invalid = new DomainError("request.invalid_cursor");
 
   let decoded: unknown;
   try {
@@ -131,7 +121,7 @@ export class TasksService {
     const id = this.parseId(rawId);
     const task = await this.tasks.findById(id, DEV_WORKSPACE_ID);
     if (task === undefined) {
-      throw new NotFoundException("Tâche introuvable");
+      throw new DomainError("task.not_found");
     }
     return task;
   }
@@ -139,24 +129,24 @@ export class TasksService {
   private parseId(rawId: string): string {
     const parsedId = uuidSchema.safeParse(rawId);
     if (!parsedId.success) {
-      throw new BadRequestException(["id: identifiant invalide"]);
+      throw new DomainError("request.invalid_field", { field: "id" });
     }
     return parsedId.data;
   }
 
   private applyMutation(result: MutationResult, source: VersionSource): Task {
     if (result.status === "not_found") {
-      throw new NotFoundException("Tâche introuvable");
+      throw new DomainError("task.not_found");
     }
     if (result.status === "conflict") {
-      const detail = `version: version attendue obsolète, version courante ${result.currentVersion}`;
+      const params = { currentVersion: result.currentVersion };
       // Un `If-Match` non satisfait est une précondition échouée (412,
       // RFC 9110 §13.1.1) ; une version passée dans le corps ou la query est
       // un conflit applicatif (409). Le code `CONFLICT_VERSION` est identique.
       if (source === "if-match") {
-        throw new HttpException([detail], HttpStatus.PRECONDITION_FAILED);
+        throw new DomainError("task.version_precondition_failed", params);
       }
-      throw new ConflictException([detail]);
+      throw new DomainError("task.version_mismatch", params);
     }
     return result.task;
   }
@@ -182,7 +172,7 @@ export class TasksService {
     };
 
     if (Object.keys(patch).length === 0) {
-      throw new BadRequestException(["body: aucun champ à modifier"]);
+      throw new DomainError("request.empty_patch");
     }
 
     return this.applyMutation(

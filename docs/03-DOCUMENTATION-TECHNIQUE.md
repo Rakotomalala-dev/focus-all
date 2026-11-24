@@ -277,6 +277,14 @@ Le paquet est compilé en `dist/` (CommonJS, `.d.ts`) : Turborepo garantit l'ord
 
 Règle de sécurité (N-7) : `detail` est **omis** sur les 5xx — le message interne part dans les logs avec le `requestId`, jamais dans la réponse.
 
+**Erreurs du domaine et clé i18n.** Un refus métier (tâche absente, version obsolète, version absente, curseur illisible, champ invalide) est levé par le service en `DomainError` (`apps/api/src/common/domain-error.ts`) : `code`, `status` et `messageKey` viennent d'un **catalogue indexé par la clé**, et les paramètres sont typés par clé (`{ currentVersion }`, `{ field }`). Le filtre recopie ces éléments dans le problem et **omet `detail`** : aucune phrase ne circule, le client traduit `messageKey` avec `params`. `detail` reste réservé aux erreurs de schéma Zod (liste des champs fautifs, déjà diagnostique) et aux exceptions HTTP hors domaine. Exemple de conflit résolu par la clé :
+
+```json
+{"type":"about:blank","title":"Precondition Failed","status":412,
+ "code":"CONFLICT_VERSION","instance":"/api/v1/tasks/42","requestId":"req-4",
+ "messageKey":"task.version_precondition_failed","params":{"currentVersion":3}}
+```
+
 ### 2.8 Endpoints tâches (repository en mémoire)
 
 Première feature verticale : `controller → service → repository`, avec validation par `taskDraftSchema` et sortie d'erreur par le filtre problem+json.

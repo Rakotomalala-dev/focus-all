@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PROBLEM_CONTENT_TYPE, type ErrorCode, type ProblemDetails } from "@focus/contracts";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { DomainError } from "./domain-error";
 
 // Table explicite plutôt qu'une déduction : un code stable est un contrat
 // public, il ne doit pas dépendre d'une heuristique (doc 01, N-8).
@@ -91,7 +92,28 @@ function detailFor(exception: unknown, status: number): string | undefined {
   return undefined;
 }
 
+// Une erreur du domaine porte déjà son statut, son code public et sa clé i18n :
+// rien à déduire, et surtout aucun `detail` en français à recopier.
+function fromDomainError(exception: DomainError, request: RequestInfo): ProblemResponse {
+  const problem: ProblemDetails = {
+    type: "about:blank",
+    title: titleForStatus(exception.status),
+    status: exception.status,
+    code: exception.code,
+    instance: request.url,
+    requestId: request.requestId,
+    messageKey: exception.messageKey,
+    ...(exception.params === undefined ? {} : { params: exception.params }),
+  };
+
+  return { status: exception.status, problem };
+}
+
 export function toProblem(exception: unknown, request: RequestInfo): ProblemResponse {
+  if (exception instanceof DomainError) {
+    return fromDomainError(exception, request);
+  }
+
   const status =
     exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 

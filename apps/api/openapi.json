@@ -698,6 +698,19 @@
           "requestId": {
             "type": "string",
             "minLength": 1
+          },
+          "messageKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number"
+              ]
+            }
           }
         },
         "required": [

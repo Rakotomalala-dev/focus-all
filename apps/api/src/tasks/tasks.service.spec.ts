@@ -1,5 +1,6 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { BadRequestException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
+import { DomainError } from "../common/domain-error";
 import { InMemoryTaskRepository } from "./task.repository";
 import { TasksService } from "./tasks.service";
 
@@ -69,15 +70,16 @@ describe("TasksService.list", () => {
   it("refuse un curseur illisible ou de forme inattendue", async () => {
     const service = createService();
     const base64 = (value: string): string => Buffer.from(value, "utf8").toString("base64url");
+    const invalidCursor = { messageKey: "request.invalid_cursor", status: 400 };
 
-    await expect(service.list({ cursor: "bof" })).rejects.toThrow(BadRequestException);
+    await expect(service.list({ cursor: "bof" })).rejects.toMatchObject(invalidCursor);
     // JSON valide mais clé de tri incomplète, puis id non UUID.
-    await expect(service.list({ cursor: base64('{"sortOrder":"000001"}') })).rejects.toThrow(
-      BadRequestException,
+    await expect(service.list({ cursor: base64('{"sortOrder":"000001"}') })).rejects.toMatchObject(
+      invalidCursor,
     );
     await expect(
       service.list({ cursor: base64('{"sortOrder":"000001","id":"42"}') }),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toMatchObject(invalidCursor);
   });
 
   it("utilise la clé de tri de la dernière tâche comme curseur", async () => {
@@ -108,9 +110,15 @@ describe("TasksService.findById", () => {
   it("renvoie 404 pour un UUID inconnu et 400 pour un identifiant invalide", async () => {
     const service = createService();
 
-    await expect(service.findById("018f3b3c-1a2b-7c3d-8e4f-ffffffffffff")).rejects.toThrow(
-      NotFoundException,
+    await expect(service.findById("018f3b3c-1a2b-7c3d-8e4f-ffffffffffff")).rejects.toBeInstanceOf(
+      DomainError,
     );
-    await expect(service.findById("42")).rejects.toThrow(BadRequestException);
+    await expect(service.findById("018f3b3c-1a2b-7c3d-8e4f-ffffffffffff")).rejects.toMatchObject({
+      messageKey: "task.not_found",
+      status: 404,
+    });
+    await expect(service.findById("42")).rejects.toMatchObject({
+      messageKey: "request.invalid_field",
+    });
   });
 });

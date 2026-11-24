@@ -1,5 +1,5 @@
-import { NotFoundException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
+import { DomainError } from "../common/domain-error";
 import { DEV_WORKSPACE_ID } from "./dev-workspace";
 import { InMemoryTaskRepository, type StoredTask } from "./task.repository";
 import { TasksService } from "./tasks.service";
@@ -85,7 +85,10 @@ describe("cloisonnement par workspace — service (404, jamais 403)", () => {
   it("renvoie 404 en lecture", async () => {
     const { service } = setup();
 
-    await expect(service.findById(FOREIGN_TASK_ID)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findById(FOREIGN_TASK_ID)).rejects.toMatchObject({
+      messageKey: "task.not_found",
+      status: 404,
+    });
   });
 
   it("renvoie 404 en modification, même avec une version obsolète", async () => {
@@ -93,12 +96,12 @@ describe("cloisonnement par workspace — service (404, jamais 403)", () => {
 
     await expect(
       service.update(FOREIGN_TASK_ID, { title: "intrusion", version: 0 }, undefined),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toBeInstanceOf(DomainError);
     // Version obsolète comprise : le 404 doit primer, sinon 409 révélerait
     // l'existence et même la version de la tâche.
     await expect(
       service.update(FOREIGN_TASK_ID, { title: "intrusion", version: 42 }, undefined),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toMatchObject({ messageKey: "task.not_found", status: 404 });
 
     await expect(repository.findById(FOREIGN_TASK_ID, OTHER_WORKSPACE_ID)).resolves.toMatchObject({
       title: "tâche 3",
@@ -109,9 +112,9 @@ describe("cloisonnement par workspace — service (404, jamais 403)", () => {
   it("renvoie 404 en suppression", async () => {
     const { service, repository } = setup();
 
-    await expect(service.remove(FOREIGN_TASK_ID, { version: 0 }, undefined)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(service.remove(FOREIGN_TASK_ID, { version: 0 }, undefined)).rejects.toMatchObject({
+      messageKey: "task.not_found",
+    });
     await expect(repository.findById(FOREIGN_TASK_ID, OTHER_WORKSPACE_ID)).resolves.toBeDefined();
   });
 

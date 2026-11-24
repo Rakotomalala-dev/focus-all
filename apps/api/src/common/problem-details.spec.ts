@@ -1,31 +1,41 @@
-import {
-  BadRequestException,
-  ConflictException,
-  HttpException,
-  NotFoundException,
-} from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
+import { DomainError } from "./domain-error";
 import { codeForStatus, toProblem } from "./problem-details.filter";
 
 const REQUEST = { url: "/api/v1/tasks/42", requestId: "req-1" };
 
 describe("toProblem", () => {
-  it("mappe une 404 sur NOT_FOUND avec instance et requestId", () => {
-    const { status, problem } = toProblem(new NotFoundException("Tâche introuvable"), REQUEST);
+  it("traduit une DomainError en statut, code et clé, sans `detail`", () => {
+    const { status, problem } = toProblem(new DomainError("task.not_found"), REQUEST);
 
     expect(status).toBe(404);
     expect(problem.code).toBe("NOT_FOUND");
     expect(problem.title).toBe("Not Found");
     expect(problem.instance).toBe(REQUEST.url);
     expect(problem.requestId).toBe(REQUEST.requestId);
-    expect(problem.detail).toBe("Tâche introuvable");
+    expect(problem.messageKey).toBe("task.not_found");
+    expect(problem.detail).toBeUndefined();
   });
 
-  it("mappe une 409 sur CONFLICT_VERSION (contrôle optimiste)", () => {
+  it("transmet les paramètres typés de la clé (version courante)", () => {
+    const exception = new DomainError("task.version_precondition_failed", { currentVersion: 3 });
+
+    const { status, problem } = toProblem(exception, REQUEST);
+
+    expect(status).toBe(412);
+    expect(problem.code).toBe("CONFLICT_VERSION");
+    expect(problem.title).toBe("Precondition Failed");
+    expect(problem.messageKey).toBe("task.version_precondition_failed");
+    expect(problem.params).toEqual({ currentVersion: 3 });
+  });
+
+  it("mappe une exception HTTP hors domaine sur son statut, sans clé", () => {
     const { status, problem } = toProblem(new ConflictException(), REQUEST);
 
     expect(status).toBe(409);
     expect(problem.code).toBe("CONFLICT_VERSION");
+    expect(problem.messageKey).toBeUndefined();
   });
 
   it("aplatit un tableau de messages de validation", () => {
@@ -41,15 +51,7 @@ describe("toProblem", () => {
     expect(problem.code).toBe("INTERNAL");
     expect(problem.title).toBe("Internal Server Error");
     expect(problem.detail).toBeUndefined();
-  });
-
-  it("mappe 412 sur CONFLICT_VERSION (If-Match non satisfait)", () => {
-    const { status, problem } = toProblem(new HttpException(["version obsolète"], 412), REQUEST);
-
-    expect(status).toBe(412);
-    expect(problem.code).toBe("CONFLICT_VERSION");
-    expect(problem.title).toBe("Precondition Failed");
-    expect(problem.detail).toBe("version obsolète");
+    expect(problem.messageKey).toBeUndefined();
   });
 
   it("retombe sur REQUEST_REJECTED pour un 4xx non mappé", () => {
