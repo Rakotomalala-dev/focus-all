@@ -1,0 +1,104 @@
+name: CI
+
+# Doc 03 §12 : CI sur PR + push sur `main`.
+# Objectif : prouver en environnement propre que la plage `engines`
+# (`.npmrc` `engine-strict=true`) est réellement satisfaite sur Node 22 LTS,
+# et que install / typecheck / lint / test / build:web passent sans aucun
+# contournement de `engine-strict`.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify (node 22, pnpm 9)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: "true"
+      TURBO_TELEMETRY_DISABLED: "1"
+      DO_NOT_TRACK: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # `.nvmrc` contient `22` : setup-node résout la dernière 22.x LTS.
+      # `engines` (`>=22.12 <23`) doit être satisfait sans marge de manœuvre.
+      - name: Set up Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable corepack and pin pnpm from packageManager
+        run: |
+          corepack enable
+          corepack install
+          echo "node: $(node -v)"
+          echo "pnpm: $(pnpm -v)"
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-
+
+      # Garde-fou : la CI échoue si `engine-strict` a été retiré ou désactivé,
+      # et si la version de Node sort de la plage `engines`.
+      - name: Assert engine-strict is enforced
+        run: |
+          set -euo pipefail
+          if ! grep -qx 'engine-strict=true' .npmrc; then
+            echo "::error file=.npmrc::engine-strict=true est absent ou désactivé ; la CI refuse de s'exécuter sans cette contrainte."
+            exit 1
+          fi
+          # Vérifie explicitement la plage `engines.node`, sans dépendre du
+          # comportement de pnpm : si la version sort, la CI échoue ici.
+          node - <<'NODE'
+          const range = require('./package.json').engines.node;
+          const match = range.match(/^>=\s*(\d+)\.(\d+)\s*<\s*(\d+)$/);
+          if (!match) {
+            console.error(`engines.node "${range}" non reconnu par le garde-fou`);
+            process.exit(1);
+          }
+          const [minMajor, minMinor, maxMajor] = match.slice(1).map(Number);
+          const [major, minor] = process.versions.node.split('.').map(Number);
+          const isInRange = major < maxMajor && (major > minMajor || minor >= minMinor);
+          if (!isInRange) {
+            console.error(`Node ${process.versions.node} hors plage engines "${range}"`);
+            process.exit(1);
+          }
+          console.log(`Node ${process.versions.node} conforme à engines "${range}"`);
+          NODE
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build web (Expo export)
+        run: pnpm build:web
