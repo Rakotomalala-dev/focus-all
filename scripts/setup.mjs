@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Pre-flight checks for a fresh workstation (run with `pnpm setup`).
+// Pre-flight checks for a fresh workstation (`pnpm run setup`).
 //
-// Verifies the runtime against `engines`, reports whether pnpm can be resolved
-// at all (Corepack and nvm shims can intercept it), and warns when Docker is
-// missing. Human-facing output is French, like the project documentation.
+// Two guarantees only: refuse a runtime outside `engines`, and refuse to treat
+// a range this script cannot parse as satisfied. Everything else is a warning.
+// Human-facing output is French, like the project documentation.
 // See docs/03-DOCUMENTATION-TECHNIQUE.md §1.3.2.
 
 import { execFileSync, execSync } from "node:child_process";
@@ -14,13 +14,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = JSON.parse(readFileSync(resolve(projectRoot, "package.json"), "utf8"));
 
-export function parseVersion(value) {
+function parseVersion(value) {
   return String(value)
     .split(".")
     .map((part) => Number.parseInt(part, 10) || 0);
 }
 
-export function compareVersions(left, right) {
+function compareVersions(left, right) {
   const leftParts = parseVersion(left);
   const rightParts = parseVersion(right);
   for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
@@ -53,35 +53,24 @@ export function satisfies(version, range) {
   return true;
 }
 
-export function majorOf(range) {
-  const match = String(range).match(/([0-9]+)/);
-  return match ? match[1] : null;
-}
-
-export function commandExists(command, args = ["--version"]) {
+// A non-zero exit still proves the command exists, which is what callers ask.
+export function probeCommand(command, args) {
   try {
     execFileSync(command, args, { stdio: "ignore" });
-    return true;
+    return "ok";
   } catch (error) {
-    // Only a missing executable means "absent"; a non-zero exit means it exists.
-    return error?.code !== "ENOENT";
-  }
-}
-
-export function commandSucceeds(command, args) {
-  try {
-    execFileSync(command, args, { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
+    return error?.code === "ENOENT" ? "missing" : "failed";
   }
 }
 
 export function detectPnpmVersion() {
-  const userAgent = process.env.npm_config_user_agent ?? "";
-  const fromAgent = /(?:^|\s)pnpm\/([0-9][0-9.]*)/.exec(userAgent);
-  if (fromAgent) {
-    return fromAgent[1];
+  // Set when the script is launched through `pnpm run`: that pnpm is the one
+  // that matters, and this avoids spawning another one.
+  const fromUserAgent = /(?:^|\s)pnpm\/([0-9][0-9.]*)/.exec(
+    process.env.npm_config_user_agent ?? "",
+  );
+  if (fromUserAgent) {
+    return fromUserAgent[1];
   }
   try {
     // A shell is required so that pnpm.cmd resolves on Windows.
@@ -95,22 +84,23 @@ export function detectPnpmVersion() {
   }
 }
 
-export function detectPnpmPath() {
+function detectPnpmPath() {
   const command = process.platform === "win32" ? "where pnpm" : "which pnpm";
   try {
-    const output = execSync(command, {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    const first = output.split(/\r?\n/).find((line) => line.trim() !== "");
-    return first ? first.trim() : null;
+    const output = execSync(command, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    return (
+      output
+        .split(/\r?\n/)
+        .find((line) => line.trim() !== "")
+        ?.trim() ?? null
+    );
   } catch {
     return null;
   }
 }
 
 function report(level, message) {
-  console.log(`  ${level.padEnd(4)}  ${message}`);
+  console.log(`  ${level ? level.padEnd(4) : "    "}  ${message}`);
 }
 
 function checkRuntime(version, range, label, fixHint, failures, warnings) {
@@ -120,7 +110,7 @@ function checkRuntime(version, range, label, fixHint, failures, warnings) {
     return;
   }
   if (verdict === null) {
-    warnings.push(`plage engines.${label} non vérifiable`);
+    warnings.push(`plage engines de ${label} non vérifiable`);
     report("warn", `${label} ${version} — plage "${range}" non reconnue par ce script`);
     return;
   }
@@ -135,49 +125,42 @@ function main() {
 
   console.log("\nContrôle de l’environnement Focus\n");
 
-  const nodeRange = manifest.engines?.node ?? "";
   checkRuntime(
     process.version.replace(/^v/, ""),
-    nodeRange,
+    manifest.engines?.node ?? "",
     "Node",
     "nvm use 22 (Windows : nvm install 22.23.5 puis nvm use 22.23.5)",
     failures,
     warnings,
   );
 
-  const pnpmRange = manifest.engines?.pnpm ?? "";
   const pnpmVersion = detectPnpmVersion();
   if (pnpmVersion === null) {
     failures.push("pnpm introuvable");
     report("fail", "pnpm introuvable — Corepack doit l’exposer");
     report("", "corrigez avec : corepack enable");
   } else {
+    // `corepack install` applies the `packageManager` version pinned by the repo.
     checkRuntime(
       pnpmVersion,
-      pnpmRange,
+      manifest.engines?.pnpm ?? "",
       "pnpm",
-      `corepack prepare pnpm@${majorOf(pnpmRange) ?? "9"} --activate`,
+      "corepack install",
       failures,
       warnings,
     );
-
     const pnpmPath = detectPnpmPath();
     if (pnpmPath) {
       report("", `binaire résolu : ${pnpmPath}`);
-      if (failures.length > 0 && /nvm[\\/](\.nodejs|installs)/i.test(pnpmPath)) {
-        report(
-          "",
-          "pnpm passe par un shim nvm : lancez `nvm use` puis `corepack enable` dans le même terminal",
-        );
-      }
     }
   }
 
-  if (!commandExists("docker")) {
+  // Docker is needed for Postgres, Redis, MinIO and MailHog (§2.3), never to code.
+  if (probeCommand("docker", ["--version"]) === "missing") {
     warnings.push("Docker absent");
     report("warn", "Docker introuvable — requis pour Postgres, Redis, MinIO et MailHog");
     report("", "installez Docker Desktop (Windows/macOS) ou docker + docker compose (Linux)");
-  } else if (!commandSucceeds("docker", ["compose", "version"])) {
+  } else if (probeCommand("docker", ["compose", "version"]) !== "ok") {
     warnings.push("plugin docker compose absent");
     report("warn", "Docker présent, mais `docker compose` indisponible — voir doc 03 §2.3");
   } else {
@@ -185,14 +168,15 @@ function main() {
   }
 
   console.log("");
+  const doc = "Procédure détaillée : docs/03-DOCUMENTATION-TECHNIQUE.md §1.3.2";
   if (failures.length > 0) {
     console.log(`Environnement NON conforme : ${failures.join(" ; ")}.`);
-    console.log("Procédure détaillée : docs/03-DOCUMENTATION-TECHNIQUE.md §1.3.2\n");
+    console.log(`${doc}\n`);
     process.exit(1);
   }
   if (warnings.length > 0) {
     console.log(`Environnement conforme, avec réserve(s) : ${warnings.join(" ; ")}.`);
-    console.log("Procédure détaillée : docs/03-DOCUMENTATION-TECHNIQUE.md §1.3.2\n");
+    console.log(`${doc}\n`);
     return;
   }
   console.log("Environnement conforme — vous pouvez lancer `pnpm install`.\n");
