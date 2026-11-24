@@ -48,7 +48,7 @@ L'analyse a été menée avant toute rédaction, sans modification de fichier.
 | Élément | Valeur constatée | Incidence |
 |---|---|---|
 | OS de développement | Windows (shell Git Bash) | Les scripts npm doivent rester compatibles POSIX **et** Windows ; éviter `rm -rf` nu dans les scripts, privilégier `rimraf` ou des scripts Node |
-| Node.js | v25.8.1 | Version **non LTS**. À épingler sur Node 22 LTS (voir ADR-016) |
+| Node.js | v22.23.5 (nvm-windows 2.0.1, version `default`) | Version **LTS**, dans la plage `engines` `>=22.12 <23` — conformité établie le 2026-11-24 (voir ADR-016 et doc 03 §1.3.1) |
 | npm | 11.11.0 | Suffisant, mais le projet cible **pnpm** (ADR-003) |
 | Bun | absent | Non requis ; ne pas introduire de dépendance à Bun |
 | Git | dépôt initialisé, `user.name` / `user.email` configurés | Prêt pour Conventional Commits (voir doc 04) |
@@ -290,8 +290,8 @@ Les ADR sont numérotés de manière stable et référencés par les quatre autr
 | | |
 |---|---|
 | **Statut** | Accepté |
-| **Décision** | Node **22 LTS** épinglé (`engines`, `.nvmrc`, image Docker `node:22-alpine`), pnpm 9, TypeScript 5.x en `strict` + `noUncheckedIndexedAccess`. Le poste de développement constaté (Node 25.8.1) doit être réaligné ; Node 25 n'est pas supporté par les versions LTS d'Expo/Nest au moment de la rédaction. |
-| **Conséquences** | (−) contrainte pour les contributeurs, automatisée par `engines` + `corepack`. |
+| **Décision** | Node **22 LTS** épinglé (`engines`, `.nvmrc`, image Docker `node:22-alpine`), pnpm 9, TypeScript 5.x en `strict` + `noUncheckedIndexedAccess`. Le poste de développement est **réaligné** (2026-11-24) sur Node **22.23.5** via nvm-windows 2.0.1, avec pnpm 9.15.9 fourni par Corepack ; Node 25 n'est pas supporté par les versions LTS d'Expo/Nest. |
+| **Conséquences** | (−) contrainte pour les contributeurs, automatisée par `engines` + `corepack`. (+) réalignement vérifié : avec `engine-strict=true` actif, `pnpm install`, `pnpm typecheck`, `pnpm lint`, `pnpm test` et `pnpm build:web` sortent en code `0` sous Node 22.23.5. |
 
 ### ADR-017 — Identifiants et horodatages
 
