@@ -236,7 +236,46 @@ pnpm typecheck && pnpm lint && pnpm test
 curl -s http://localhost:4000/health/ready | jq
 ```
 
-Attendu : `{"status":"ok","checks":{"database":"up","redis":"up"}}`.
+Attendu : `{"status":"ok","checks":{"database":"up","redis":"up"}}`. À ce stade du socle, `database` et `redis` valent `not_configured` (aucun module Prisma/Redis branché).
+
+### 2.7 Contrats partagés (`packages/contracts`)
+
+`@focus/contracts` est la **seule** source des schémas entrants/sortants de l'API (doc 01 R2 : dépendance Zod uniquement). L'API et, plus tard, le client mobile consomment ses types inférés — aucun DTO redéfini localement (TS-1).
+
+```bash
+pnpm --filter @focus/contracts build      # dist/ + .d.ts (nécessaire avant l'API)
+pnpm --filter @focus/contracts test       # schémas : cas nominaux et rejets
+```
+
+| Fichier | Contenu |
+|---|---|
+| `src/error-codes.ts` | `ERROR_CODES` (`as const`) + `errorCodeSchema` : codes **stables** et publics, seuls éléments testables par un client |
+| `src/problem-details.ts` | `problemDetailsSchema` (RFC 9457) et `PROBLEM_CONTENT_TYPE` = `application/problem+json` |
+| `src/task.ts` | `TASK_STATUSES`, `TASK_PRIORITIES`, `taskDraftSchema` (entrée, valeurs par défaut serveur), `taskSchema` (entité), `pageQuerySchema`/`taskListQuerySchema` (curseur, jamais d'offset) |
+
+Le paquet est compilé en `dist/` (CommonJS, `.d.ts`) : Turborepo garantit l'ordre via `build` avant `typecheck`/`lint`/`build` des applications (`dependsOn: ["^build"]`).
+
+#### 2.7.1 Erreurs HTTP : `application/problem+json`
+
+`ProblemDetailsFilter` (global, `APP_FILTER` dans `AppModule`) applique la RFC 9457 à **toute** exception, y compris les 404 de route inconnue : Nest enregistre lui-même son gestionnaire 404, qui traverse le filtre — inutile et interdit d'appeler `setNotFoundHandler` sur Fastify (erreur `Not found handler already set`).
+
+```json
+{"type":"about:blank","title":"Not Found","status":404,
+ "code":"NOT_FOUND","instance":"/api/v1/inconnu","requestId":"req-3"}
+```
+
+| Statut | `code` |
+|---|---|
+| 400, 422 | `VALIDATION_FAILED` |
+| 401 | `UNAUTHENTICATED` |
+| 403 | `FORBIDDEN` |
+| 404 | `NOT_FOUND` |
+| 409 | `CONFLICT_VERSION` |
+| 429 | `RATE_LIMITED` |
+| ≥ 500 | `INTERNAL` |
+| autre 4xx | `REQUEST_REJECTED` |
+
+Règle de sécurité (N-7) : `detail` est **omis** sur les 5xx — le message interne part dans les logs avec le `requestId`, jamais dans la réponse.
 
 ---
 
