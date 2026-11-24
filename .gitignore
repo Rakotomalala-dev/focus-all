@@ -67,5 +67,4 @@ desktop.ini
 
 # --- Divers ---
 *.local
-openapi.json.tmp
 backup_*.sql

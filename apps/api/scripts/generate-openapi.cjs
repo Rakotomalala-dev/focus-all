@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 "use strict";
 
 // Génère ` apps/api/openapi.json ` depuis les schémas Zod de @focus/contracts,
@@ -8,7 +7,7 @@
 //
 // Usage :
 //   node scripts/generate-openapi.cjs           # écrit openapi.json
-//   node scripts/generate-openapi.cjs --check    # échoue si le fichier dérive
+//   node scripts/generate-openapi.cjs --check   # échoue si le fichier dérive
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -16,6 +15,7 @@ const { zodToJsonSchema } = require("zod-to-json-schema");
 const contracts = require("@focus/contracts");
 
 const OUTPUT_PATH = path.join(__dirname, "..", "openapi.json");
+const REF_PREFIX = "#/components/schemas/";
 
 // Schémas exposés comme composants nommés. Toute nouvelle ressource s'ajoute
 // ici, sinon elle ne sera pas publiée dans le contrat.
@@ -30,7 +30,7 @@ const COMPONENTS = {
 const UUID = { type: "string", format: "uuid" };
 const JSON_CONTENT = "application/json";
 
-const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
+const ref = (name) => ({ $ref: `${REF_PREFIX}${name}` });
 
 const problemResponse = (description) => ({
   description,
@@ -64,26 +64,16 @@ const taskResponse = (description) => ({
   content: { [JSON_CONTENT]: { schema: ref("Task") } },
 });
 
-// Remplace `#/definitions/X` par `#/components/schemas/X` : c'est la seule
-// différence de structure entre la sortie de zod-to-json-schema et OpenAPI.
-function hoistComponents() {
-  const collected = {};
+// `$refStrategy: "none"` inline les schémas réutilisés : chaque composant
+// publié est autonome, sans `$ref` vers un sous-chemin d'un autre composant,
+// et il n'y a donc aucun `#/definitions/*` à réécrire.
+function collectSchemas() {
+  const schemas = {};
   for (const [name, schema] of Object.entries(COMPONENTS)) {
-    const json = zodToJsonSchema(schema, { name, $refStrategy: "none" });
-    const definitions = json.definitions ?? {};
-    for (const [definitionName, definition] of Object.entries(definitions)) {
-      collected[definitionName] = definition;
-    }
-    if (definitions[name] === undefined) {
-      throw new Error(`zod-to-json-schema n'a pas produit le composant attendu : ${name}`);
-    }
+    const { definitions = {} } = zodToJsonSchema(schema, { name, $refStrategy: "none" });
+    Object.assign(schemas, definitions);
   }
-
-  const serialized = JSON.stringify(collected).replaceAll(
-    "#/definitions/",
-    "#/components/schemas/",
-  );
-  return JSON.parse(serialized);
+  return schemas;
 }
 
 // Un `$ref` cassé produirait un document invalide que seule une validation
@@ -100,20 +90,15 @@ function assertReferencesResolve(document) {
     if (typeof node !== "object" || node === null) {
       return;
     }
-    if (typeof node.$ref === "string") {
-      const prefix = "#/components/schemas/";
-      const name = node.$ref.startsWith(prefix) ? node.$ref.slice(prefix.length) : undefined;
-      if (name === undefined || !available.has(name)) {
-        broken.push(`${location} -> ${node.$ref}`);
-      }
+    if (typeof node.$ref === "string" && !available.has(node.$ref.replace(REF_PREFIX, ""))) {
+      broken.push(`${location} -> ${node.$ref}`);
     }
     for (const [key, value] of Object.entries(node)) {
       walk(value, `${location}.${key}`);
     }
   };
 
-  walk(document.paths, "paths");
-  walk(document.components, "components");
+  walk(document, "document");
   if (broken.length > 0) {
     throw new Error(`Références introuvables dans le document :\n  ${broken.join("\n  ")}`);
   }
@@ -220,7 +205,7 @@ function buildDocument() {
         },
       },
     },
-    components: { schemas: hoistComponents() },
+    components: { schemas: collectSchemas() },
   };
 }
 
