@@ -7,14 +7,21 @@ export type TaskFilters = {
   readonly projectId?: string;
 };
 
+// Clé de tri d'une tâche : (sortOrder, id). Le curseur transporte cette clé,
+// jamais une position, pour que la pagination reste juste quand la liste change.
+export type TaskCursor = {
+  readonly sortOrder: string;
+  readonly id: string;
+};
+
 export type TaskPage = {
-  readonly offset: number;
   readonly limit: number;
+  readonly after?: TaskCursor;
 };
 
 export type TaskPageResult = {
   readonly items: readonly Task[];
-  readonly total: number;
+  readonly hasMore: boolean;
 };
 
 // Port du repository (N-1/N-2) : le service ne connaît ni Prisma ni le stockage.
@@ -27,13 +34,43 @@ export interface TaskRepository {
 
 export const TASK_REPOSITORY = "TASK_REPOSITORY";
 
+export function compareTasks(left: Task, right: Task): number {
+  if (left.sortOrder !== right.sortOrder) {
+    return left.sortOrder < right.sortOrder ? -1 : 1;
+  }
+  if (left.id === right.id) {
+    return 0;
+  }
+  return left.id < right.id ? -1 : 1;
+}
+
+// Comparaison stricte avec la clé du curseur, dans le même ordre que
+// `compareTasks` : (sortOrder, puis id pour départager deux clés égales).
+export function isAfterCursor(task: Task, cursor: TaskCursor): boolean {
+  if (task.sortOrder !== cursor.sortOrder) {
+    return task.sortOrder > cursor.sortOrder;
+  }
+  return task.id > cursor.id;
+}
+
 // Implémentation en mémoire : elle rend la feature testable sans PostgreSQL.
-// Elle est volontairement limitée (pas de persistance, pas de transaction) et
-// sera remplacée par le repository Prisma quand la base sera branchée.
 @Injectable()
 export class InMemoryTaskRepository implements TaskRepository {
   private readonly tasks = new Map<string, Task>();
   private sequence = 0;
+
+  // Fabrique réservée aux tests : elle peuple une liste dont l'ordre est
+  // connu (insertion avant le curseur, clés de tri égales). Le constructeur
+  // doit rester sans paramètre, sinon Nest tente d'injecter `Array`
+  // (`design:paramtypes`) et refuse de démarrer l'application.
+  static withTasks(seed: readonly Task[]): InMemoryTaskRepository {
+    const repository = new InMemoryTaskRepository();
+    for (const task of seed) {
+      repository.tasks.set(task.id, task);
+    }
+    repository.sequence = seed.length;
+    return repository;
+  }
 
   async create(draft: TaskDraft, workspaceId: string): Promise<Task> {
     const now = new Date().toISOString();
@@ -45,6 +82,7 @@ export class InMemoryTaskRepository implements TaskRepository {
       title: draft.title,
       priority: draft.priority,
       status: "TODO",
+      // Clé de tri croissante : une tâche créée se place toujours en fin de liste.
       sortOrder: `${this.sequence.toString(36).padStart(6, "0")}`,
       version: 0,
       completedAt: null,
@@ -72,11 +110,16 @@ export class InMemoryTaskRepository implements TaskRepository {
       .filter((task) => task.workspaceId === workspaceId)
       .filter((task) => filters.status === undefined || task.status === filters.status)
       .filter((task) => filters.projectId === undefined || task.projectId === filters.projectId)
-      .sort((left, right) => left.sortOrder.localeCompare(right.sortOrder));
+      .sort(compareTasks)
+      .filter((task) => page.after === undefined || isAfterCursor(task, page.after));
+
+    // Un élément de plus que demandé : c'est ce qui révèle `hasMore` sans
+    // compter la collection entière.
+    const window = matching.slice(0, page.limit + 1);
 
     return {
-      items: matching.slice(page.offset, page.offset + page.limit),
-      total: matching.length,
+      items: window.slice(0, page.limit),
+      hasMore: window.length > page.limit,
     };
   }
 }

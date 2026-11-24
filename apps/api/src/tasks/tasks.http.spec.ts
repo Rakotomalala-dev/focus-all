@@ -170,6 +170,28 @@ describe("pagination par curseur", () => {
     expect(secondPage.items.some((task) => firstIds.has(task.id))).toBe(false);
   });
 
+  it("garde le curseur valide quand une tâche est créée entre deux pages", async () => {
+    const firstPage = parseList((await request("/api/v1/tasks?limit=2")).body);
+    const cursor = firstPage.nextCursor ?? "";
+    expect(cursor).not.toBe("");
+
+    const created = taskSchema.parse((await postTask({ title: "arrivée après la page 1" })).body);
+    const secondPage = parseList(
+      (await request(`/api/v1/tasks?limit=2&cursor=${encodeURIComponent(cursor)}`)).body,
+    );
+
+    const firstIds = new Set(firstPage.items.map((item) => item.id));
+    // Aucune répétition d'une tâche déjà vue : le curseur repart de la clé de
+    // tri, pas d'un rang que l'insertion aurait décalé.
+    expect(secondPage.items.some((item) => firstIds.has(item.id))).toBe(false);
+
+    // Et la tâche créée reste atteignable depuis le même curseur.
+    const reachable = parseList(
+      (await request(`/api/v1/tasks?limit=10&cursor=${encodeURIComponent(cursor)}`)).body,
+    );
+    expect(reachable.items.map((item) => item.id)).toContain(created.id);
+  });
+
   it("refuse un curseur forgé en 400", async () => {
     const result = await request("/api/v1/tasks?cursor=bof");
 

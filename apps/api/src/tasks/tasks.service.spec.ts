@@ -66,8 +66,34 @@ describe("TasksService.list", () => {
     await expect(service.list({ limit: "0" })).rejects.toThrow(BadRequestException);
   });
 
-  it("refuse un curseur forgé", async () => {
-    await expect(createService().list({ cursor: "bof" })).rejects.toThrow(BadRequestException);
+  it("refuse un curseur illisible ou de forme inattendue", async () => {
+    const service = createService();
+    const base64 = (value: string): string => Buffer.from(value, "utf8").toString("base64url");
+
+    await expect(service.list({ cursor: "bof" })).rejects.toThrow(BadRequestException);
+    // JSON valide mais clé de tri incomplète, puis id non UUID.
+    await expect(service.list({ cursor: base64('{"sortOrder":"000001"}') })).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(
+      service.list({ cursor: base64('{"sortOrder":"000001","id":"42"}') }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it("utilise la clé de tri de la dernière tâche comme curseur", async () => {
+    const service = createService();
+    await service.create({ title: "un" });
+    await service.create({ title: "deux" });
+
+    const first = await service.list({ limit: "1" });
+    const cursor = first.nextCursor ?? "";
+    const decoded: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+
+    // Le curseur expose (sortOrder, id) de la dernière tâche, pas un rang.
+    expect(decoded).toMatchObject({
+      sortOrder: first.items[0]?.sortOrder,
+      id: first.items[0]?.id,
+    });
   });
 });
 

@@ -7,7 +7,12 @@ import {
   type TaskListResponse,
 } from "@focus/contracts";
 import { DEV_WORKSPACE_ID } from "./dev-workspace";
-import { TASK_REPOSITORY, type TaskFilters, type TaskRepository } from "./task.repository";
+import {
+  TASK_REPOSITORY,
+  type TaskCursor,
+  type TaskFilters,
+  type TaskRepository,
+} from "./task.repository";
 
 type Issue = { readonly path: readonly (string | number)[]; readonly message: string };
 
@@ -20,16 +25,39 @@ export function describeIssues(issues: readonly Issue[]): string[] {
   });
 }
 
-export function encodeCursor(offset: number): string {
-  return Buffer.from(String(offset), "utf8").toString("base64url");
+// Le curseur transporte la clé de tri de la dernière tâche vue, pas un rang :
+// si la liste change entre deux pages (insertion, réordonnancement), aucune
+// tâche n'est sautée ni répétée.
+export function encodeCursor(task: Task): string {
+  return Buffer.from(JSON.stringify({ sortOrder: task.sortOrder, id: task.id }), "utf8").toString(
+    "base64url",
+  );
 }
 
-function decodeCursor(cursor: string): number {
-  const offset = Number(Buffer.from(cursor, "base64url").toString("utf8"));
-  if (!Number.isInteger(offset) || offset <= 0) {
-    throw new BadRequestException(["cursor: curseur invalide"]);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function decodeCursor(cursor: string): TaskCursor {
+  const invalid = new BadRequestException(["cursor: curseur invalide"]);
+
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+  } catch {
+    throw invalid;
   }
-  return offset;
+  if (!isRecord(decoded)) {
+    throw invalid;
+  }
+
+  const sortOrder = decoded.sortOrder;
+  const parsedId = uuidSchema.safeParse(decoded.id);
+  if (typeof sortOrder !== "string" || sortOrder.length === 0 || !parsedId.success) {
+    throw invalid;
+  }
+
+  return { sortOrder, id: parsedId.data };
 }
 
 @Injectable()
@@ -63,20 +91,24 @@ export class TasksService {
     }
 
     const { cursor, limit, status, projectId } = parsed.data;
-    const offset = cursor === undefined ? 0 : decodeCursor(cursor);
     // `exactOptionalPropertyTypes` : une clé optionnelle ne peut pas valoir
     // `undefined`, elle est donc omise quand le filtre est absent.
     const filters: TaskFilters = {
       ...(status === undefined ? {} : { status }),
       ...(projectId === undefined ? {} : { projectId }),
     };
+    const after = cursor === undefined ? undefined : decodeCursor(cursor);
 
-    const page = await this.tasks.list(filters, DEV_WORKSPACE_ID, { offset, limit });
-    const nextOffset = offset + page.items.length;
+    const page = await this.tasks.list(
+      filters,
+      DEV_WORKSPACE_ID,
+      after === undefined ? { limit } : { limit, after },
+    );
+    const last = page.items.at(-1);
 
     return {
       items: [...page.items],
-      nextCursor: nextOffset < page.total ? encodeCursor(nextOffset) : null,
+      nextCursor: page.hasMore && last !== undefined ? encodeCursor(last) : null,
     };
   }
 }

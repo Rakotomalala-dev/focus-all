@@ -297,7 +297,7 @@ curl -s -X POST http://localhost:4000/api/v1/tasks \
 Propriétés importantes :
 
 - **Identifiants UUID v7** générés côté serveur (`src/common/uuid-v7.ts`) : ordonnés dans le temps, comme l'impose ADR-017.
-- **Pagination par curseur opaque** (`base64url` d'un offset) : aucun `offset` exposé au client ; un curseur forgé renvoie `400 VALIDATION_FAILED`.
+- **Pagination par curseur *keyset*** : le curseur (`base64url`) transporte la **clé de tri** de la dernière tâche vue — `{ sortOrder, id }` —, jamais un rang. Si une tâche est créée ou déplacée entre deux pages, aucune tâche n'est sautée ni répétée. Un curseur illisible, incomplet ou portant un id non UUID renvoie `400 VALIDATION_FAILED`. La réponse porte `nextCursor: null` en fin de parcours.
 - **`workspaceId` serveur** (`DEV_WORKSPACE_ID`) : jamais lu depuis le corps ou la requête (N-3). À remplacer par le workspace de session dès que l'authentification arrive.
 - **Repository en mémoire** (`InMemoryTaskRepository`) : aucune persistance, données perdues au redémarrage. Il implémente le port `TaskRepository` ; passer à Prisma ne changera que le `useClass` du module.
 
