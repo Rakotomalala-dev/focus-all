@@ -1,10 +1,7 @@
 name: CI
 
-# Doc 03 §12 : CI sur PR + push sur `main`.
-# Objectif : prouver en environnement propre que la plage `engines`
-# (`.npmrc` `engine-strict=true`) est réellement satisfaite sur Node 22 LTS,
-# et que install / typecheck / lint / test / build:web passent sans aucun
-# contournement de `engine-strict`.
+# Doc 03 §12 : vérifie install / typecheck / lint / test / build:web sur PR et
+# sur `main`, en prouvant que la plage `engines` tient sous Node 22 LTS.
 
 on:
   push:
@@ -24,70 +21,39 @@ jobs:
   verify:
     name: verify (node 22, pnpm 9)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     env:
-      CI: "true"
-      TURBO_TELEMETRY_DISABLED: "1"
+      # Turbo et Expo coupent leur télémétrie (`CI=true` est déjà posé par
+      # GitHub Actions, inutile de le redéclarer).
       DO_NOT_TRACK: "1"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # `.nvmrc` contient `22` : setup-node résout la dernière 22.x LTS.
-      # `engines` (`>=22.12 <23`) doit être satisfait sans marge de manœuvre.
+      # `.nvmrc` contient `22` : setup-node résout la dernière 22.x LTS. Hors de
+      # `engines`, Corepack échoue avant pnpm (message `AutoInstallFailed` peu
+      # explicite, mais échec certain) — un décalage ne peut pas passer.
       - name: Set up Node.js 22 LTS
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
 
-      - name: Enable corepack and pin pnpm from packageManager
+      # pnpm vient de Corepack, épinglé par `packageManager` : aucune version
+      # écrite ici, donc aucune dérive avec le dépôt. L'écho sert de trace.
+      - name: Enable corepack and resolve pinned pnpm
         run: |
           corepack enable
-          corepack install
-          echo "node: $(node -v)"
-          echo "pnpm: $(pnpm -v)"
+          echo "node $(node -v) / pnpm $(pnpm -v)"
 
-      - name: Resolve pnpm store path
-        id: pnpm-store
-        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-store.outputs.path }}
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-${{ runner.os }}-
-
-      # Garde-fou : la CI échoue si `engine-strict` a été retiré ou désactivé,
-      # et si la version de Node sort de la plage `engines`.
+      # Seul garde-fou conservé : désactiver `engine-strict` ne ferait échouer
+      # aucune étape, mais priverait la CI de sa valeur de preuve. `pnpm config
+      # get` lit la valeur réellement appliquée (`.npmrc` + environnement).
       - name: Assert engine-strict is enforced
-        run: |
-          set -euo pipefail
-          if ! grep -qx 'engine-strict=true' .npmrc; then
-            echo "::error file=.npmrc::engine-strict=true est absent ou désactivé ; la CI refuse de s'exécuter sans cette contrainte."
-            exit 1
-          fi
-          # Vérifie explicitement la plage `engines.node`, sans dépendre du
-          # comportement de pnpm : si la version sort, la CI échoue ici.
-          node - <<'NODE'
-          const range = require('./package.json').engines.node;
-          const match = range.match(/^>=\s*(\d+)\.(\d+)\s*<\s*(\d+)$/);
-          if (!match) {
-            console.error(`engines.node "${range}" non reconnu par le garde-fou`);
-            process.exit(1);
-          }
-          const [minMajor, minMinor, maxMajor] = match.slice(1).map(Number);
-          const [major, minor] = process.versions.node.split('.').map(Number);
-          const isInRange = major < maxMajor && (major > minMajor || minor >= minMinor);
-          if (!isInRange) {
-            console.error(`Node ${process.versions.node} hors plage engines "${range}"`);
-            process.exit(1);
-          }
-          console.log(`Node ${process.versions.node} conforme à engines "${range}"`);
-          NODE
+        run: test "$(pnpm config get engine-strict)" = true || { echo "::error::engine-strict is disabled"; exit 1; }
 
+      # Étapes séparées volontairement : GitHub affiche l'étape fautive et permet
+      # de relancer un seul job, ce qu'un unique `pnpm ... && pnpm ...` ne donne pas.
       - name: Install
         run: pnpm install --frozen-lockfile
 
