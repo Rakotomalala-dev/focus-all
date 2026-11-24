@@ -440,8 +440,8 @@ flowchart TD
 | `pnpm dev:api` / `pnpm dev:app` | Démarrage ciblé |
 | `pnpm build` | Build de tous les paquets et apps |
 | `pnpm lint` / `pnpm typecheck` / `pnpm test` | Vérifications transverses |
-| `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:reset` | Prisma migrates / seed / reset local |
-| `pnpm api:openapi` | Génère `openapi.json` depuis les schémas Zod |
+| `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:reset` | Prisma migrates / seed / reset local — **avec Prisma (M1)**, absents tant que la cible n'existe pas |
+| `pnpm api:openapi` / `pnpm api:openapi:check` | Génère `openapi.json` depuis les schémas Zod / échoue si le fichier commité a dérivé |
 | `pnpm docker:up` / `pnpm docker:down` | Services locaux (Postgres, Redis, MinIO, MailHog) |
 
 Détail d'installation et d'exécution : **doc 03**.

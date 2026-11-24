@@ -66,5 +66,11 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # Doc 03 §6.1 : `openapi.json` est commité, donc le contrat ne peut pas
+      # changer sans que le fichier suive. La génération dépend de
+      # `@focus/contracts`, que le script construit lui-même.
+      - name: OpenAPI drift check
+        run: pnpm api:openapi:check
+
       - name: Build web (Expo export)
         run: pnpm build:web

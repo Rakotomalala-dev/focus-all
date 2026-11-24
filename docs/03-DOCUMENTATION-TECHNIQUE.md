@@ -345,18 +345,21 @@ packages:
 | `pnpm typecheck` | racine | `tsc --noEmit` par paquet |
 | `pnpm test` | racine | tests unitaires (Vitest) |
 | `pnpm test:watch` | paquet | mode watch |
-| `pnpm test:integration` | `apps/api` | tests avec Postgres éphémère |
-| `pnpm test:e2e:web` | racine | Playwright sur le build web |
-| `pnpm test:e2e:mobile` | racine | Maestro sur émulateur |
-| `pnpm db:migrate` | `apps/api` | `prisma migrate dev` |
-| `pnpm db:deploy` | `apps/api` | `prisma migrate deploy` (CI/prod) |
-| `pnpm db:seed` | `apps/api` | `tsx prisma/seed.ts` |
-| `pnpm db:reset` | `apps/api` | `prisma migrate reset --force` (local uniquement) |
-| `pnpm db:studio` | `apps/api` | Prisma Studio |
-| `pnpm api:openapi` | `apps/api` | génère `openapi.json` |
+| `pnpm api:openapi` | `apps/api` | **existe** — génère `apps/api/openapi.json` depuis les schémas de `@focus/contracts` |
+| `pnpm api:openapi:check` | `apps/api` | **existe** — échoue si `openapi.json` a dérivé des schémas (utilisé en CI) |
+| `pnpm test:integration` | `apps/api` | à venir — M1, avec Postgres éphémère (Docker) |
+| `pnpm test:e2e:web` | racine | à venir — Playwright pas encore installé |
+| `pnpm test:e2e:mobile` | racine | à venir — Maestro pas encore installé |
+| `pnpm db:migrate` | `apps/api` | à venir — M1, avec Prisma |
+| `pnpm db:deploy` | `apps/api` | à venir — M1, avec Prisma (CI/prod) |
+| `pnpm db:seed` | `apps/api` | à venir — M1, avec Prisma |
+| `pnpm db:reset` | `apps/api` | à venir — M1, avec Prisma (local uniquement) |
+| `pnpm db:studio` | `apps/api` | à venir — M1, avec Prisma |
 | `pnpm docker:up` / `docker:down` | racine | services locaux |
 | `pnpm ios` / `pnpm android` | `apps/mobile` | build natif local |
 | `pnpm desktop:dev` | `apps/desktop` | `tauri dev` (V1.1) |
+
+Un script n'est déclaré dans `package.json` que s'il a une cible : un script racine qui pointe vers un script de paquet inexistant échoue au premier appel et donne l'illusion d'un outillage disponible. Les commandes marquées « à venir » ci-dessus sont donc **absentes** de `package.json` et seront ajoutées avec leur cible (Prisma pour `db:*`, Playwright pour `test:e2e:web`, Postgres éphémère pour `test:integration`).
 
 ### 3.3 Configuration Turborepo
 
@@ -538,10 +541,17 @@ En production : sauvegarde complète quotidienne + WAL continu (PITR), rétentio
 ### 6.1 Génération de la documentation
 
 ```bash
-pnpm api:openapi     # écrit apps/api/openapi.json depuis les schémas Zod
+pnpm api:openapi        # écrit apps/api/openapi.json (le fichier est commité)
+pnpm api:openapi:check  # échoue si le fichier commité ne correspond plus aux schémas
 ```
 
-Swagger UI : `http://localhost:4000/docs` (dev/preview uniquement). Le fichier `openapi.json` est un artefact de CI : il est comparé au fichier commité, et toute divergence échoue le build (détection de contrat cassé).
+**Chaîne de génération.** `apps/api/scripts/generate-openapi.cjs` convertit les schémas Zod de `@focus/contracts` (seule source, R2/R6) avec `zod-to-json-schema` (seule dépendance ajoutée : réécrire les schémas à la main dans l'OpenAPI recréerait la dérive que ce contrôle existe pour détecter). Les composants sont hissés de `#/definitions/*` vers `#/components/schemas/*`, puis un contrôle interne vérifie que **chaque `$ref` pointe sur un composant émis** — une référence cassée fait échouer la génération au lieu de produire un document invalide.
+
+**Part écrite à la main : la table des routes.** Aucun schéma Zod ne porte de métadonnée HTTP (méthode, chemin, statuts, en-têtes) : `paths` est donc décrit explicitement dans le script (~80 lignes). Toute nouvelle route doit y être ajoutée ; les schémas, eux, ne sont jamais dupliqués. Document en **OpenAPI 3.1** (JSON Schema 2020-12, donc `anyOf` + `type: "null"` pour les champs nullables, sans traduction `nullable`).
+
+**Détection de dérive.** `openapi.json` est **commité** : la CI exécute `pnpm api:openapi:check`, qui régénère le document en mémoire et le compare octet pour octet au fichier versionné. Toute divergence échoue avec la première ligne fautive, ce qui rend impossible un contrat modifié sans que le fichier suive. `openapi.json.tmp` est ignoré par Git (fichier de travail temporaire).
+
+**Pas encore de Swagger UI** : `@nestjs/swagger` n'est pas installé et `http://localhost:4000/docs` ne sert rien aujourd'hui. Le contrat publiable est le fichier généré ; l'UI interactive viendra avec la première route authentifiée, si elle apporte quelque chose.
 
 ### 6.2 Authentification — flux complet
 
@@ -779,12 +789,11 @@ flowchart TB
 ### 8.2 Commandes
 
 ```bash
-pnpm test                                   # unitaires, tout le monorepo
+pnpm test                                   # unitaires + intégration HTTP (tout le monorepo)
 pnpm --filter @focus/api test:watch         # watch sur l'API
-pnpm --filter @focus/api test:integration   # intégration (Docker requis)
-pnpm test:e2e:web                           # Playwright (build web requis)
-pnpm test:e2e:mobile                        # Maestro (émulateur requis)
 ```
+
+Les commandes suivantes arriveront avec leur cible : `test:integration` exige un Postgres éphémère (M1, Docker), `test:e2e:web` Playwright, `test:e2e:mobile` Maestro. Elles ne sont volontairement pas déclarées dans `package.json` tant qu'elles échoueraient (voir §3.2). Les tests HTTP de `tasks.http.spec.ts` et `tasks.mutations.http.spec.ts` démarrent la vraie application Nest sur un port éphémère : ils couvrent déjà le transport sans base de données.
 
 ### 8.3 Tests de convergence (obligatoires, sync)
 

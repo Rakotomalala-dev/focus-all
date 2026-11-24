@@ -1,0 +1,713 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Focus API",
+    "version": "1.0.0",
+    "description": "Contrat REST de Focus. Généré depuis `@focus/contracts` par `pnpm api:openapi` — ne pas éditer à la main. Erreurs au format RFC 9457 (`application/problem+json`). Concurrence optimiste : la version attendue vient du corps (`version`) ou de `If-Match` ; une version obsolète donne `409` si elle vient du corps ou de la query, `412` si elle vient de `If-Match`, avec le même code `CONFLICT_VERSION`."
+  },
+  "paths": {
+    "/api/v1/tasks": {
+      "get": {
+        "summary": "Lister les tâches du workspace courant",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Curseur opaque renvoyé par la page précédente.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TODO",
+                "IN_PROGRESS",
+                "DONE",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page de tâches, triée par `sortOrder` puis `id`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Paramètres invalides",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer une tâche",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tâche créée",
+            "headers": {
+              "Location": {
+                "description": "URL de la tâche créée",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Version courante ; à renvoyer tel quel dans `If-Match`.",
+                "schema": {
+                  "type": "string",
+                  "example": "\"3\""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{id}": {
+      "get": {
+        "summary": "Lire une tâche",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tâche demandée",
+            "headers": {
+              "ETag": {
+                "description": "Version courante ; à renvoyer tel quel dans `If-Match`.",
+                "schema": {
+                  "type": "string",
+                  "example": "\"3\""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Identifiant qui n'est pas un UUID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tâche introuvable dans ce workspace",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Modifier partiellement une tâche",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Version attendue (`3`, `\"3\"` ou `W/\"3\"`). Obsolète → `412` ; absente et sans `version` dans le corps → `400`.",
+            "schema": {
+              "type": "string",
+              "example": "\"3\""
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tâche mise à jour, `version` incrémentée",
+            "headers": {
+              "ETag": {
+                "description": "Version courante ; à renvoyer tel quel dans `If-Match`.",
+                "schema": {
+                  "type": "string",
+                  "example": "\"3\""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide ou version attendue absente",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tâche introuvable dans ce workspace",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version obsolète fournie dans le corps ou la query",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Version obsolète fournie via If-Match",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer une tâche",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Version attendue (`3`, `\"3\"` ou `W/\"3\"`). Obsolète → `412` ; absente et sans `version` dans le corps → `400`.",
+            "schema": {
+              "type": "string",
+              "example": "\"3\""
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Tâche supprimée, sans corps"
+          },
+          "400": {
+            "description": "Identifiant invalide ou version attendue absente",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tâche introuvable dans ce workspace",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version obsolète fournie dans la query",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Version obsolète fournie via If-Match",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Task": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "URGENT"
+            ],
+            "default": "NONE"
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 20,
+            "default": []
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "TODO",
+              "IN_PROGRESS",
+              "DONE",
+              "CANCELLED"
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sortOrder": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "title",
+          "id",
+          "status",
+          "completedAt",
+          "sortOrder",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "TaskDraft": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "URGENT"
+            ],
+            "default": "NONE"
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 20,
+            "default": []
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "TaskUpdate": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "URGENT"
+            ]
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 20
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "TODO",
+              "IN_PROGRESS",
+              "DONE",
+              "CANCELLED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaskListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 10000
+                },
+                "projectId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "dueDate": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "NONE",
+                    "LOW",
+                    "MEDIUM",
+                    "HIGH",
+                    "URGENT"
+                  ],
+                  "default": "NONE"
+                },
+                "tagIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 20,
+                  "default": []
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "TODO",
+                    "IN_PROGRESS",
+                    "DONE",
+                    "CANCELLED"
+                  ]
+                },
+                "completedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sortOrder": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "title",
+                "id",
+                "status",
+                "completedAt",
+                "sortOrder",
+                "version",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          },
+          "instance": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "VALIDATION_FAILED",
+              "UNAUTHENTICATED",
+              "FORBIDDEN",
+              "NOT_FOUND",
+              "REQUEST_REJECTED",
+              "CONFLICT_VERSION",
+              "RATE_LIMITED",
+              "INTERNAL"
+            ]
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

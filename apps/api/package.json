@@ -2,7 +2,7 @@
   "name": "@focus/api",
   "version": "0.1.0",
   "private": true,
-  "description": "API Focus — NestJS (Fastify). Socle M0 : health uniquement.",
+  "description": "API Focus — NestJS (Fastify). Health et endpoints tasks (M1).",
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",
@@ -10,7 +10,9 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "api:openapi": "pnpm --filter @focus/contracts build && node scripts/generate-openapi.cjs",
+    "api:openapi:check": "pnpm --filter @focus/contracts build && node scripts/generate-openapi.cjs --check"
   },
   "dependencies": {
     "@focus/contracts": "workspace:*",
@@ -25,6 +27,7 @@
     "@nestjs/schematics": "^10.2.3",
     "@types/node": "^22.10.5",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "zod-to-json-schema": "^3.24.1"
   }
 }
