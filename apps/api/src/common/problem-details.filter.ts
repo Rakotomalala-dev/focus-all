@@ -18,6 +18,9 @@ const CODE_BY_STATUS: Readonly<Record<number, ErrorCode>> = {
   [HttpStatus.FORBIDDEN]: "FORBIDDEN",
   [HttpStatus.NOT_FOUND]: "NOT_FOUND",
   [HttpStatus.CONFLICT]: "CONFLICT_VERSION",
+  // 412 : version fournie via `If-Match`, donc précondition HTTP échouée
+  // (RFC 9110 §13.1.1). Le code métier reste le même que pour 409.
+  [HttpStatus.PRECONDITION_FAILED]: "CONFLICT_VERSION",
   [HttpStatus.TOO_MANY_REQUESTS]: "RATE_LIMITED",
 };
 
@@ -28,6 +31,7 @@ const TITLE_BY_STATUS: Readonly<Record<number, string>> = {
   [HttpStatus.FORBIDDEN]: "Forbidden",
   [HttpStatus.NOT_FOUND]: "Not Found",
   [HttpStatus.CONFLICT]: "Conflict",
+  [HttpStatus.PRECONDITION_FAILED]: "Precondition Failed",
   [HttpStatus.TOO_MANY_REQUESTS]: "Too Many Requests",
 };
 
@@ -66,6 +70,12 @@ function detailFor(exception: unknown, status: number): string | undefined {
   const response = exception.getResponse();
   if (typeof response === "string") {
     return response.length > 0 ? response : undefined;
+  }
+  // `new HttpException(["…"], 412)` renvoie le tableau tel quel, sans
+  // l'envelopper dans `{ message: [...] }` : les deux formes sont acceptées.
+  if (Array.isArray(response)) {
+    const parts = response.filter((item): item is string => typeof item === "string");
+    return parts.length > 0 ? parts.join(", ") : undefined;
   }
   if (!isRecord(response)) {
     return undefined;

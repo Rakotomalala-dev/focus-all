@@ -301,7 +301,15 @@ Propriétés importantes :
 - **Identifiants UUID v7** générés côté serveur (`src/common/uuid-v7.ts`) : ordonnés dans le temps, comme l'impose ADR-017.
 - **Pagination par curseur *keyset*** : le curseur (`base64url`) transporte la **clé de tri** de la dernière tâche vue — `{ sortOrder, id }` —, jamais un rang. Si une tâche est créée ou déplacée entre deux pages, aucune tâche n'est sautée ni répétée. Un curseur illisible, incomplet ou portant un id non UUID renvoie `400 VALIDATION_FAILED`. La réponse porte `nextCursor: null` en fin de parcours.
 - **`workspaceId` serveur** (`DEV_WORKSPACE_ID`) : jamais lu depuis le corps ou la requête (N-3). À remplacer par le workspace de session dès que l'authentification arrive.
-- **Contrôle optimiste obligatoire** : `PATCH` et `DELETE` exigent la version attendue, sous forme de champ `version`, d'en-tête `If-Match` (`3`, `"3"` ou `W/"3"`) ou de query `version`. Sans elle : `400 VALIDATION_FAILED` — jamais d'écrasement silencieux. Version obsolète : `409 CONFLICT_VERSION`, la tâche restant intacte.
+- **Contrôle optimiste obligatoire** : `PATCH` et `DELETE` exigent la version attendue, sous forme de champ `version`, d'en-tête `If-Match` (`3`, `"3"` ou `W/"3"`) ou de query `version`. Sans elle : `400 VALIDATION_FAILED` — jamais d'écrasement silencieux. Si le corps porte une version **et** un `If-Match`, le corps gagne.
+- **Statut en cas de version obsolète** — la tâche n'est jamais modifiée :
+
+| Provenance de la version | Statut HTTP | `code` | `title` |
+|---|---|---|---|
+| corps (`version`) ou query (`?version=`) | `409 Conflict` | `CONFLICT_VERSION` | `Conflict` |
+| en-tête `If-Match` | `412 Precondition Failed` | `CONFLICT_VERSION` | `Precondition Failed` |
+
+  **Décision** : un `If-Match` non satisfait n'est pas un conflit de ressource mais une **précondition HTTP échouée** (RFC 9110 §13.1.1) → `412`. Une version passée dans le corps ou la query n'est pas une précondition (ce n'est pas un ETag) : c'est un conflit applicatif → `409`. Le **code métier reste `CONFLICT_VERSION`** dans les deux cas, pour que le client n'ait qu'une seule branche de traitement des conflits ; seul le statut distingue le mécanisme. Le filtre `problem+json` mappe donc `409` **et** `412` sur `CONFLICT_VERSION`.
 - **Complétion** : passer à `DONE` horodate `completedAt` une seule fois ; revenir à un autre statut l'efface (doc 02, RF tâches).
 - **Repository en mémoire** (`InMemoryTaskRepository`) : aucune persistance, données perdues au redémarrage, suppression physique. Il implémente le port `TaskRepository` ; passer à Prisma ne changera que le `useClass` du module (et introduira la suppression logique et la transaction du `SyncChange`).
 

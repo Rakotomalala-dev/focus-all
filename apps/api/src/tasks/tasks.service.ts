@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   NotFoundException,
@@ -63,20 +65,32 @@ function parseIfMatch(ifMatch: string | undefined): number | undefined {
   return Number(match[1]);
 }
 
-// La version attendue peut venir du corps, de l'en-tête `If-Match` ou de la
-// query ; sans elle, aucun contrôle optimiste n'est possible → 400 (jamais un
-// écrasement silencieux).
+// Provenance de la version attendue : elle décide du statut en cas d'échec.
+type VersionSource = "payload" | "if-match";
+
+type ExpectedVersion = {
+  readonly version: number;
+  readonly source: VersionSource;
+};
+
+// La version attendue peut venir du corps, de la query ou de l'en-tête
+// `If-Match` ; sans elle, aucun contrôle optimiste n'est possible → 400
+// (jamais un écrasement silencieux). Le corps gagne sur l'en-tête s'il en
+// porte une : c'est la forme la plus explicite.
 function resolveExpectedVersion(
   fromPayload: number | undefined,
   ifMatch: string | undefined,
-): number {
-  const version = fromPayload ?? parseIfMatch(ifMatch);
-  if (version === undefined) {
-    throw new BadRequestException([
-      "version: version attendue absente (champ `version`, en-tête If-Match ou query `version`)",
-    ]);
+): ExpectedVersion {
+  if (fromPayload !== undefined) {
+    return { version: fromPayload, source: "payload" };
   }
-  return version;
+  const fromHeader = parseIfMatch(ifMatch);
+  if (fromHeader !== undefined) {
+    return { version: fromHeader, source: "if-match" };
+  }
+  throw new BadRequestException([
+    "version: version attendue absente (champ `version`, en-tête If-Match ou query `version`)",
+  ]);
 }
 
 function decodeCursor(cursor: string): TaskCursor {
@@ -130,14 +144,19 @@ export class TasksService {
     return parsedId.data;
   }
 
-  private applyMutation(result: MutationResult): Task {
+  private applyMutation(result: MutationResult, source: VersionSource): Task {
     if (result.status === "not_found") {
       throw new NotFoundException("Tâche introuvable");
     }
     if (result.status === "conflict") {
-      throw new ConflictException(
-        `version: version attendue obsolète, version courante ${result.currentVersion}`,
-      );
+      const detail = `version: version attendue obsolète, version courante ${result.currentVersion}`;
+      // Un `If-Match` non satisfait est une précondition échouée (412,
+      // RFC 9110 §13.1.1) ; une version passée dans le corps ou la query est
+      // un conflit applicatif (409). Le code `CONFLICT_VERSION` est identique.
+      if (source === "if-match") {
+        throw new HttpException([detail], HttpStatus.PRECONDITION_FAILED);
+      }
+      throw new ConflictException([detail]);
     }
     return result.task;
   }
@@ -150,7 +169,7 @@ export class TasksService {
     }
 
     const { version, ...fields } = parsed.data;
-    const expectedVersion = resolveExpectedVersion(version, ifMatch);
+    const expected = resolveExpectedVersion(version, ifMatch);
     // `exactOptionalPropertyTypes` : chaque clé absente est omise du patch.
     const patch: TaskPatch = {
       ...(fields.title === undefined ? {} : { title: fields.title }),
@@ -167,7 +186,8 @@ export class TasksService {
     }
 
     return this.applyMutation(
-      await this.tasks.update(id, DEV_WORKSPACE_ID, patch, expectedVersion),
+      await this.tasks.update(id, DEV_WORKSPACE_ID, patch, expected.version),
+      expected.source,
     );
   }
 
@@ -178,8 +198,11 @@ export class TasksService {
       throw new BadRequestException(describeIssues(parsed.error.issues));
     }
 
-    const expectedVersion = resolveExpectedVersion(parsed.data.version, ifMatch);
-    this.applyMutation(await this.tasks.remove(id, DEV_WORKSPACE_ID, expectedVersion));
+    const expected = resolveExpectedVersion(parsed.data.version, ifMatch);
+    this.applyMutation(
+      await this.tasks.remove(id, DEV_WORKSPACE_ID, expected.version),
+      expected.source,
+    );
   }
 
   async list(rawQuery: unknown): Promise<TaskListResponse> {

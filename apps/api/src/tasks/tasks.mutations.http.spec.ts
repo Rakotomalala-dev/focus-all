@@ -104,7 +104,7 @@ describe("PATCH /api/v1/tasks/:id", () => {
     expect(reopened.version).toBe(2);
   });
 
-  it("refuse une version obsolète en 409 CONFLICT_VERSION", async () => {
+  it("version du corps obsolète : 409 CONFLICT_VERSION", async () => {
     const created = await createTask();
     await patch(created.id, { title: "première modification", version: 0 });
 
@@ -122,6 +122,20 @@ describe("PATCH /api/v1/tasks/:id", () => {
 
     expect(result.status).toBe(200);
     expect(taskSchema.parse(result.body).title).toBe("via if-match");
+  });
+
+  it("If-Match obsolète : 412 Precondition Failed, même code CONFLICT_VERSION", async () => {
+    const created = await createTask();
+    await patch(created.id, { title: "première modification", version: 0 });
+
+    const result = await patch(created.id, { title: "seconde modification" }, '"0"');
+
+    expect(result.status).toBe(412);
+    expect(result.contentType).toContain("application/problem+json");
+    const problem = problemDetailsSchema.parse(result.body);
+    expect(problem.code).toBe("CONFLICT_VERSION");
+    expect(problem.title).toBe("Precondition Failed");
+    expect(problem.detail).toContain("version courante 1");
   });
 
   it("refuse une requête sans version en 400 VALIDATION_FAILED", async () => {
@@ -179,7 +193,7 @@ describe("DELETE /api/v1/tasks/:id", () => {
     expect((await request(`/api/v1/tasks/${created.id}`)).status).toBe(404);
   });
 
-  it("refuse une version obsolète en 409 CONFLICT_VERSION et conserve la tâche", async () => {
+  it("version de la query obsolète : 409 CONFLICT_VERSION, la tâche reste", async () => {
     const created = await createTask();
     await patch(created.id, { title: "modifiée", version: 0 });
 
@@ -187,6 +201,19 @@ describe("DELETE /api/v1/tasks/:id", () => {
 
     expect(result.status).toBe(409);
     expect(problemDetailsSchema.parse(result.body).code).toBe("CONFLICT_VERSION");
+    expect((await request(`/api/v1/tasks/${created.id}`)).status).toBe(200);
+  });
+
+  it("If-Match obsolète : 412 Precondition Failed, la tâche reste", async () => {
+    const created = await createTask();
+    await patch(created.id, { title: "modifiée", version: 0 });
+
+    const result = await remove(created.id, undefined, '"0"');
+
+    expect(result.status).toBe(412);
+    const problem = problemDetailsSchema.parse(result.body);
+    expect(problem.code).toBe("CONFLICT_VERSION");
+    expect(problem.title).toBe("Precondition Failed");
     expect((await request(`/api/v1/tasks/${created.id}`)).status).toBe(200);
   });
 

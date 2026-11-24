@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  NotFoundException,
+} from "@nestjs/common";
 import { describe, expect, it } from "vitest";
 import { codeForStatus, toProblem } from "./problem-details.filter";
 
@@ -36,6 +41,15 @@ describe("toProblem", () => {
     expect(problem.code).toBe("INTERNAL");
     expect(problem.title).toBe("Internal Server Error");
     expect(problem.detail).toBeUndefined();
+  });
+
+  it("mappe 412 sur CONFLICT_VERSION (If-Match non satisfait)", () => {
+    const { status, problem } = toProblem(new HttpException(["version obsolète"], 412), REQUEST);
+
+    expect(status).toBe(412);
+    expect(problem.code).toBe("CONFLICT_VERSION");
+    expect(problem.title).toBe("Precondition Failed");
+    expect(problem.detail).toBe("version obsolète");
   });
 
   it("retombe sur REQUEST_REJECTED pour un 4xx non mappé", () => {
