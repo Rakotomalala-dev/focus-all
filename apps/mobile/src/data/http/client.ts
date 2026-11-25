@@ -16,31 +16,19 @@ export type HttpClient = {
 
 export type HttpClientOptions = {
   readonly baseUrl: string;
-  readonly getAccessToken: () => string | null;
   readonly platform: string;
-  readonly timeoutMs?: number;
 };
 
-const DEFAULT_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 15_000;
 
-export function createHttpClient(options: HttpClientOptions): HttpClient {
+export function createHttpClient({ baseUrl, platform }: HttpClientOptions): HttpClient {
   const instance: AxiosInstance = axios.create({
-    baseURL: options.baseUrl,
-    timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    baseURL: baseUrl,
+    timeout: REQUEST_TIMEOUT_MS,
     headers: {
       Accept: "application/json",
-      "X-Client-Platform": options.platform,
+      "X-Client-Platform": platform,
     },
-  });
-
-  // Jeton en mémoire uniquement (ADR-007) : le client interroge le store au
-  // moment de la requête, jamais une copie figée à la création.
-  instance.interceptors.request.use((config) => {
-    const token = options.getAccessToken();
-    if (token !== null) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
   });
 
   async function send<T>(

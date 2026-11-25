@@ -754,7 +754,7 @@ socket.on("task.updated", (event) => {
 
 ### 7.1 Client HTTP (Axios)
 
-Le client réel vit dans `apps/mobile/src/data/http/client.ts` : il injecte le jeton du store de session, valide chaque réponse avec le schéma `@focus/contracts` et normalise les erreurs en `AppError` (clé i18n). La file de rafraîchissement viendra avec l'endpoint `/auth/refresh`.
+Le client réel vit dans `apps/mobile/src/data/http/client.ts` : il valide chaque réponse avec le schéma `@focus/contracts` et normalise les erreurs en `AppError` (clé i18n). L'injection du jeton et la file de rafraîchissement arriveront avec l'authentification (`/auth/refresh`).
 
 ```ts
 // apps/mobile/src/data/http/client.ts — cible
