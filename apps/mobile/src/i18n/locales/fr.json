@@ -1,0 +1,59 @@
+{
+  "app": {
+    "name": "Focus"
+  },
+  "tasks": {
+    "title": "Mes tâches",
+    "count_one": "{{count}} tâche",
+    "count_other": "{{count}} tâches",
+    "loading": "Chargement des tâches…",
+    "empty": {
+      "title": "Aucune tâche pour l'instant",
+      "body": "Ajoutez votre première tâche ci-dessus. « Appeler le comptable demain !haute » crée une tâche pour demain, en priorité haute."
+    },
+    "error": {
+      "title": "Impossible de charger les tâches",
+      "retry": "Réessayer"
+    },
+    "composer": {
+      "label": "Nouvelle tâche",
+      "placeholder": "Ajouter une tâche…",
+      "submit": "Ajouter",
+      "missingTitle": "Saisissez un titre.",
+      "titleTooLong": "Le titre dépasse la longueur maximale."
+    },
+    "card": {
+      "markDone": "Marquer « {{title}} » comme terminée",
+      "reopen": "Rouvrir « {{title}} »",
+      "meta": "{{status}}",
+      "metaWithPriority": "{{status}} · {{priority}}"
+    },
+    "status": {
+      "TODO": "À faire",
+      "IN_PROGRESS": "En cours",
+      "DONE": "Terminée",
+      "CANCELLED": "Annulée"
+    },
+    "priority": {
+      "NONE": "Priorité normale",
+      "LOW": "Priorité basse",
+      "MEDIUM": "Priorité moyenne",
+      "HIGH": "Priorité haute",
+      "URGENT": "Priorité urgente"
+    },
+    "dueDate": "Échéance : {{date}}"
+  },
+  "errors": {
+    "network": "Connexion impossible. Vérifiez votre réseau puis réessayez.",
+    "unknown": "Une erreur inattendue est survenue. Réessayez dans un instant.",
+    "VALIDATION_FAILED": "Certaines informations sont invalides.",
+    "UNAUTHENTICATED": "Votre session a expiré. Reconnectez-vous pour continuer.",
+    "SESSION_EXPIRED": "Votre session a expiré. Reconnectez-vous pour continuer.",
+    "FORBIDDEN": "Cette action n'est pas autorisée.",
+    "NOT_FOUND": "Cet élément n'existe plus.",
+    "REQUEST_REJECTED": "La demande a été refusée.",
+    "CONFLICT_VERSION": "Cette tâche a été modifiée ailleurs. Rechargez-la pour continuer.",
+    "RATE_LIMITED": "Trop de requêtes. Réessayez dans quelques instants.",
+    "INTERNAL": "Le serveur a rencontré un problème. Réessayez plus tard."
+  }
+}

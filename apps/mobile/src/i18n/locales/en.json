@@ -1,0 +1,59 @@
+{
+  "app": {
+    "name": "Focus"
+  },
+  "tasks": {
+    "title": "My tasks",
+    "count_one": "{{count}} task",
+    "count_other": "{{count}} tasks",
+    "loading": "Loading tasks…",
+    "empty": {
+      "title": "No tasks yet",
+      "body": "Add your first task above. “Call the accountant tomorrow !high” creates a task for tomorrow with high priority."
+    },
+    "error": {
+      "title": "Tasks could not be loaded",
+      "retry": "Try again"
+    },
+    "composer": {
+      "label": "New task",
+      "placeholder": "Add a task…",
+      "submit": "Add",
+      "missingTitle": "Enter a title.",
+      "titleTooLong": "The title exceeds the maximum length."
+    },
+    "card": {
+      "markDone": "Mark “{{title}}” as done",
+      "reopen": "Reopen “{{title}}”",
+      "meta": "{{status}}",
+      "metaWithPriority": "{{status}} · {{priority}}"
+    },
+    "status": {
+      "TODO": "To do",
+      "IN_PROGRESS": "In progress",
+      "DONE": "Done",
+      "CANCELLED": "Cancelled"
+    },
+    "priority": {
+      "NONE": "Normal priority",
+      "LOW": "Low priority",
+      "MEDIUM": "Medium priority",
+      "HIGH": "High priority",
+      "URGENT": "Urgent priority"
+    },
+    "dueDate": "Due: {{date}}"
+  },
+  "errors": {
+    "network": "Connection failed. Check your network and try again.",
+    "unknown": "An unexpected error occurred. Try again in a moment.",
+    "VALIDATION_FAILED": "Some information is invalid.",
+    "UNAUTHENTICATED": "Your session has expired. Sign in to continue.",
+    "SESSION_EXPIRED": "Your session has expired. Sign in to continue.",
+    "FORBIDDEN": "This action is not allowed.",
+    "NOT_FOUND": "This item no longer exists.",
+    "REQUEST_REJECTED": "The request was rejected.",
+    "CONFLICT_VERSION": "This task was changed elsewhere. Reload it to continue.",
+    "RATE_LIMITED": "Too many requests. Try again shortly.",
+    "INTERNAL": "The server ran into a problem. Try again later."
+  }
+}

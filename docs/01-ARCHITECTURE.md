@@ -402,7 +402,7 @@ focus-all/
 └─ .env.example
 ```
 
-**État de cette arborescence (2026-11-25).** Réalisés : `src/common/` (filtre `problem+json`, `DomainError`, UUID v7), `src/config/` (schéma Zod d'environnement, module de configuration, application du préfixe et de CORS), `src/modules/{auth,health,tasks}` et `test/helpers/` (harnais d'intégration HTTP typé et linté, exclu du build). Restent à créer avec leurs dépendances : `src/database/`, `prisma/`, `src/jobs/` et `worker.ts` (Prisma/Redis), la suite e2e sous `test/` (fixtures, scénarios), `apps/desktop/` (V1.1). Les paquets `ui` et `design-tokens` existent et sont consommés en source par Metro.
+**État de cette arborescence (2026-11-25).** Réalisés : `src/common/` (filtre `problem+json`, `DomainError`, UUID v7), `src/config/` (schéma Zod d'environnement, module de configuration, application du préfixe et de CORS), `src/modules/{auth,health,tasks}` et `test/helpers/` (harnais d'intégration HTTP typé et linté, exclu du build). Restent à créer avec leurs dépendances : `src/database/`, `prisma/`, `src/jobs/` et `worker.ts` (Prisma/Redis), la suite e2e sous `test/` (fixtures, scénarios), `apps/desktop/` (V1.1). Les paquets `ui` et `design-tokens` existent et sont consommés en source par Metro. Côté mobile, `src/data/` (client HTTP Axios typé par les contrats, store de session, repository des tâches), `src/features/tasks/` (liste, création rapide, complétion) et `src/i18n/` (catalogues `fr`/`en`) existent ; l'authentification cliente, SQLite et l'outbox restent à faire.
 
 ### 6.2 Règles de dépendance entre paquets
 
