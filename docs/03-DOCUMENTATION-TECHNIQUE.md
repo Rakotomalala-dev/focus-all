@@ -820,6 +820,8 @@ flowchart TB
 | E2E mobile | Maestro | création rapide, complétion, hors ligne | 10 scénarios |
 | Charge | k6 | `/sync/pull`, `/tasks` | doc 02 RNF-03..06 |
 
+Côté mobile, les tests de composants tournent sous Vitest via `vitest-native` (Vitest 4 dans `apps/mobile` uniquement) : le plugin transforme les sources Flow de React Native, mocke la frontière native et branche RNTL. Les hooks TanStack Query sont mockés au niveau du module (`vi.mock`), ce qui garde les composants testés sans réseau ni cache.
+
 ### 8.2 Commandes
 
 ```bash
