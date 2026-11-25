@@ -12,7 +12,7 @@ import {
   type HttpResult,
   type RequestOptions,
   type TestApi,
-} from "../../testing/test-api";
+} from "../../../test/helpers/test-api";
 
 // Test d'intégration HTTP : la vraie application Nest + Fastify, sans mock du
 // filtre. Les cas sont ordonnés (vide -> contenu -> erreurs, puis pagination),

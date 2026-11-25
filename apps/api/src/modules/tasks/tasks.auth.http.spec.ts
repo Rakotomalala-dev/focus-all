@@ -5,7 +5,7 @@ import {
   type HttpResult,
   type TestApi,
   type TokenClaims,
-} from "../../testing/test-api";
+} from "../../../test/helpers/test-api";
 
 // Authentification et cloisonnement de bout en bout : vraie application Nest +
 // Fastify, vrais jetons signés. Aucun test ne contourne le guard, sinon il ne

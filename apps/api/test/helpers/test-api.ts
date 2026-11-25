@@ -1,10 +1,10 @@
 import { NestFactory } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
-import { AppModule } from "../app.module";
-import { APP_ENV } from "../config/app-config.module";
-import type { Env } from "../config/env.schema";
-import { applyHttpConfig } from "../config/http";
+import { AppModule } from "../../src/app.module";
+import { APP_ENV } from "../../src/config/app-config.module";
+import type { Env } from "../../src/config/env.schema";
+import { applyHttpConfig } from "../../src/config/http";
 
 // Support des tests d'intégration HTTP : une seule application démarrée avec le
 // vrai bootstrap, un seul client de requêtes, des jetons signés par la
@@ -48,6 +48,9 @@ export type TestApi = {
 
 export async function startTestApi(): Promise<TestApi> {
   process.env.JWT_ACCESS_SECRET = TEST_JWT_SECRET;
+  // Le serveur écoute sur un port éphémère : un `PORT` hérité du shell n'a pas
+  // de sens ici et ferait échouer la validation d'environnement.
+  delete process.env.PORT;
 
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
     logger: false,

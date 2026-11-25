@@ -12,7 +12,7 @@ import {
   type HttpResult,
   type RequestOptions,
   type TestApi,
-} from "../../testing/test-api";
+} from "../../../test/helpers/test-api";
 
 // Même approche que tasks.http.spec.ts : vraie application Nest + Fastify,
 // réponses validées par les schémas du contrat. Chaque test crée sa propre
