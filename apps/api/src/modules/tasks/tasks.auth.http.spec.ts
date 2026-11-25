@@ -3,7 +3,8 @@ import { JwtService } from "@nestjs/jwt";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { problemDetailsSchema, taskListResponseSchema, taskSchema } from "@focus/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AppModule } from "../app.module";
+import { AppModule } from "../../app.module";
+import { applyHttpConfig } from "../../config/http";
 
 // Authentification et cloisonnement de bout en bout : vraie application Nest +
 // Fastify, vrais jetons signés. Aucun test ne contourne le guard, sinon il ne
@@ -71,7 +72,7 @@ beforeAll(async () => {
   app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
     logger: false,
   });
-  app.setGlobalPrefix("api/v1", { exclude: ["health", "health/ready"] });
+  applyHttpConfig(app);
   await app.listen(0, "127.0.0.1");
 
   const address = app.getHttpServer().address();

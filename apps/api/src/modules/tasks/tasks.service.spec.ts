@@ -1,7 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
 import type { AuthContext } from "../auth/auth-context";
-import { DomainError } from "../common/domain-error";
+import { DomainError } from "../../common/domain-error";
 import { InMemoryTaskRepository } from "./task.repository";
 import { TasksService } from "./tasks.service";
 

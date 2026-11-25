@@ -446,6 +446,15 @@ Un script n'est déclaré dans `package.json` que s'il a une cible : un script r
 | `SYNC_RETENTION_DAYS` | non | `90` | rétention du journal de sync |
 | `FEATURE_FLAGS` | non | — | `eisenhower=false,pomodoro=false` (V1.x) |
 
+**Sous-ensemble validé au démarrage (état réel).** `apps/api/src/config/env.schema.ts` valide, via Zod, les seules variables que l'API lit aujourd'hui : `NODE_ENV`, `PORT`, `API_PREFIX`, `CORS_ORIGINS`, `JWT_ACCESS_SECRET`, `JWT_ACCESS_TTL`, `JWT_ISSUER`, `JWT_AUDIENCE`. Le chargement a lieu une fois, à la création de l'application (`AppConfigModule`) :
+
+- une valeur invalide empêche le boot (fail-fast, R4) ; le message cite la variable et la règle, **jamais sa valeur** (S-5/S-12) ;
+- `PORT` vide retombe sur `4000`, mais un `PORT` non numérique échoue (jamais de port arbitraire) ;
+- `API_PREFIX` doit commencer par `/` et est réellement appliqué (`src/config/http.ts`, partagé par `main.ts` et les tests d'intégration) ; la valeur par défaut `/api/v1` est celle des chemins d'`openapi.json` — la changer impose de régénérer le contrat ;
+- `CORS_ORIGINS` est découpé en liste et nettoyé des entrées vides ; aucune origine permissive n'est ajoutée par défaut.
+
+Les autres lignes du tableau restent la cible : elles seront ajoutées au schéma avec le module qui les consomme (Prisma, Redis, stockage, e-mail, observabilité), et deviendront obligatoires à ce moment-là. `APP_ORIGIN`, `JWT_REFRESH_TTL`, `ARGON2_*` et `DATABASE_URL`/`REDIS_URL` ne sont donc pas encore validés.
+
 ### 4.3 Variables du client Expo (`apps/mobile/.env`)
 
 | Variable | Obligatoire | Défaut dev | Description |
@@ -600,7 +609,7 @@ sequenceDiagram
 
 **Réutilisation détectée** : si un refresh token déjà consommé est présenté, l'API révoque toutes les sessions de la `familyId`, journalise l'événement et renvoie `401 SESSION_REVOKED`. Aucun token n'est jamais stocké en clair.
 
-**État implémenté (2026-11-25).** Seul le maillon de **vérification** existe : `AuthGuard` global (`apps/api/src/auth/`), jeton d'accès JWT, contexte `{ userId, workspaceId }` issu des claims, `401` typés. Le flux ci-dessus reste la cible : `POST /auth/login`, `POST /auth/refresh`, la table `Session` et Argon2id ne sont pas écrits — ils dépendent de Prisma et d'un stockage utilisateur. Conséquence assumée : aucun jeton ne peut être obtenu depuis l'API ; en développement, `pnpm api:token` en signe un hors ligne. `errorCodeSchema` contient en revanche `SESSION_EXPIRED`, déjà renvoyé sur un jeton expiré.
+**État implémenté (2026-11-25).** Seul le maillon de **vérification** existe : `AuthGuard` global (`apps/api/src/modules/auth/`), jeton d'accès JWT, contexte `{ userId, workspaceId }` issu des claims, `401` typés. Le flux ci-dessus reste la cible : `POST /auth/login`, `POST /auth/refresh`, la table `Session` et Argon2id ne sont pas écrits — ils dépendent de Prisma et d'un stockage utilisateur. Conséquence assumée : aucun jeton ne peut être obtenu depuis l'API ; en développement, `pnpm api:token` en signe un hors ligne. `errorCodeSchema` contient en revanche `SESSION_EXPIRED`, déjà renvoyé sur un jeton expiré.
 
 ### 6.3 Exemples d'appels
 

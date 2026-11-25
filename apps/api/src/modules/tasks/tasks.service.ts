@@ -8,7 +8,7 @@ import {
   type Task,
   type TaskListResponse,
 } from "@focus/contracts";
-import { DomainError } from "../common/domain-error";
+import { DomainError } from "../../common/domain-error";
 import type { AuthContext } from "../auth/auth-context";
 import {
   TASK_REPOSITORY,

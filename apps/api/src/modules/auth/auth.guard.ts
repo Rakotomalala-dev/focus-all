@@ -2,7 +2,7 @@ import { Inject, Injectable, type CanActivate, type ExecutionContext } from "@ne
 import { Reflector } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
 import { uuidSchema } from "@focus/contracts";
-import { DomainError } from "../common/domain-error";
+import { DomainError } from "../../common/domain-error";
 import type { AuthContext, AuthenticatedRequest } from "./auth-context";
 import { IS_PUBLIC_KEY } from "./public.decorator";
 

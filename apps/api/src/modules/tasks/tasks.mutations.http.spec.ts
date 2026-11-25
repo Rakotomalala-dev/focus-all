@@ -8,7 +8,8 @@ import {
   type Task,
 } from "@focus/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AppModule } from "../app.module";
+import { AppModule } from "../../app.module";
+import { applyHttpConfig } from "../../config/http";
 
 // Même approche que tasks.http.spec.ts : vraie application Nest + Fastify,
 // réponses validées par les schémas du contrat. Chaque test crée sa propre
@@ -83,7 +84,7 @@ beforeAll(async () => {
   app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
     logger: false,
   });
-  app.setGlobalPrefix("api/v1", { exclude: ["health", "health/ready"] });
+  applyHttpConfig(app);
   await app.listen(0, "127.0.0.1");
 
   const address = app.getHttpServer().address();

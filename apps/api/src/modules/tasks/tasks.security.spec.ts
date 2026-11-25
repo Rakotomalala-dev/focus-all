@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AuthContext } from "../auth/auth-context";
-import { DomainError } from "../common/domain-error";
+import { DomainError } from "../../common/domain-error";
 import { InMemoryTaskRepository, type StoredTask } from "./task.repository";
 import { TasksService } from "./tasks.service";
 

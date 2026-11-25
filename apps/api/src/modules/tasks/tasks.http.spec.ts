@@ -8,7 +8,8 @@ import {
   type TaskListResponse,
 } from "@focus/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AppModule } from "../app.module";
+import { AppModule } from "../../app.module";
+import { applyHttpConfig } from "../../config/http";
 
 // Test d'intégration HTTP : la vraie application Nest + Fastify, sans mock du
 // filtre. Les cas sont ordonnés (vide -> contenu -> erreurs, puis pagination),
@@ -70,7 +71,8 @@ beforeAll(async () => {
   app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
     logger: false,
   });
-  app.setGlobalPrefix("api/v1", { exclude: ["health", "health/ready"] });
+  // Même configuration HTTP que `main.ts` : préfixe et CORS viennent de l'env.
+  applyHttpConfig(app);
   await app.listen(0, "127.0.0.1");
 
   const address = app.getHttpServer().address();

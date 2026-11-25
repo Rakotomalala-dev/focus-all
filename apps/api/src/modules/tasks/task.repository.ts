@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Task, TaskDraft, TaskPriority, TaskStatus } from "@focus/contracts";
-import { uuidV7 } from "../common/uuid-v7";
+import { uuidV7 } from "../../common/uuid-v7";
 
 // Entité stockée : le scope d'appartenance vit ici et nulle part ailleurs.
 // Il n'apparaît jamais dans une réponse HTTP (N-7), d'où la séparation avec

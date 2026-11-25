@@ -395,12 +395,14 @@ focus-all/
 │     └─ {eslint-preset.js,tsconfig.base.json,tsconfig.node.json,tsconfig.react.json}
 ├─ docs/                          # ces cinq documents
 ├─ docker/                        # compose local, Dockerfiles, init scripts
-├─ .github/workflows/             # CI/CD (aucun fichier créé à ce stade)
+├─ .github/workflows/             # CI/CD (ci.yml : install, typecheck, lint, test, dérive OpenAPI, export web)
 ├─ turbo.json
 ├─ pnpm-workspace.yaml
 ├─ package.json
 └─ .env.example
 ```
+
+**État de cette arborescence (2026-11-25).** Réalisés : `src/common/` (filtre `problem+json`, `DomainError`, UUID v7), `src/config/` (schéma Zod d'environnement, module de configuration, application du préfixe et de CORS) et `src/modules/{auth,health,tasks}`. Restent à créer avec leurs dépendances : `src/database/`, `prisma/`, `src/jobs/` et `worker.ts` (Prisma/Redis), `test/` (suite e2e), `apps/desktop/` (V1.1). Les paquets `ui` et `design-tokens` existent et sont consommés en source par Metro.
 
 ### 6.2 Règles de dépendance entre paquets
 
