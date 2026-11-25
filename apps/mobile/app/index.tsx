@@ -1,30 +1,26 @@
-import { StyleSheet, Text, View } from "react-native";
+import { AppText, Screen, useFocusTheme } from "@focus/ui";
+import { View } from "react-native";
 
-// Écran de validation du socle : aucune fonctionnalité métier (phase M0).
+// Écran de validation du socle : aucune fonctionnalité métier, mais il passe
+// déjà par le design system — plus aucune couleur ni taille littérale ici.
 export default function HomeScreen() {
+  const theme = useFocusTheme();
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Focus</Text>
-      <Text style={styles.subtitle}>Socle technique M0 — les fonctionnalités arrivent aux étapes suivantes.</Text>
-    </View>
+    <Screen>
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: theme.spacing.sm,
+        }}
+      >
+        <AppText tone="display">Focus</AppText>
+        <AppText tone="muted" style={{ textAlign: "center" }}>
+          Socle technique M0 — les fonctionnalités arrivent aux étapes suivantes.
+        </AppText>
+      </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "600",
-  },
-  subtitle: {
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-});

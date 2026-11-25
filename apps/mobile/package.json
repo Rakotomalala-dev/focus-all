@@ -15,6 +15,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@focus/design-tokens": "workspace:*",
+    "@focus/ui": "workspace:*",
     "@expo/metro-runtime": "~4.0.0",
     "expo": "~52.0.28",
     "expo-router": "~4.0.17",

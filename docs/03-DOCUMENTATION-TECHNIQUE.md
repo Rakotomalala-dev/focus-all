@@ -338,6 +338,17 @@ packages:
   - "packages/*"
 ```
 
+#### 3.1.1 Paquets du monorepo (état réel)
+
+| Paquet | Rôle | Build |
+|---|---|---|
+| `@focus/contracts` | schémas Zod, types inférés, codes d'erreur, `problem+json` | `tsc` → `dist/` (consommé par Node) |
+| `@focus/config` | presets ESLint, Prettier, `tsconfig` Node et React | — |
+| `@focus/design-tokens` | `src/tokens.ts` (couleurs, espacements, rayons, typographie, mouvement) et `src/theme.ts` | aucun : consommé **en source**, Metro transpile le TypeScript des paquets du workspace |
+| `@focus/ui` | primitives React Native (`Screen`, `AppText`, `useFocusTheme`) | aucun : même raison |
+
+Les valeurs de tokens sont celles du doc 01 §7.5 ; les neutres de texte, non listés par ce document, sont choisis pour tenir le contraste AA. Le mode clair/sombre suit le réglage système (`useColorScheme`), sans store ni préférence persistée. `packages/design-tokens/src/tokens.spec.ts` vérifie le contraste ≥ 4,5:1 du texte sur les deux surfaces, l'échelle 4 px strictement croissante, les six tailles de texte maximum et l'interlignage ≥ 1,4 (doc 04 §11.2). Aucune couleur littérale ne doit apparaître dans un écran : la règle est tenue par `@focus/ui`.
+
 ### 3.2 Scripts
 
 | Commande | Portée | Description |
