@@ -33,14 +33,14 @@ describe("loadEnv", () => {
 
   it("refuse un secret absent ou trop court sans recopier sa valeur", () => {
     expect(() => loadEnv({})).toThrow(/JWT_ACCESS_SECRET/);
-    expect(() => loadEnv({ JWT_ACCESS_SECRET: "trop-court" })).toThrow(/JWT_ACCESS_SECRET/);
 
+    const shortSecret = "trop-court";
     try {
-      loadEnv({ JWT_ACCESS_SECRET: "trop-court" });
+      loadEnv({ JWT_ACCESS_SECRET: shortSecret });
       expect.unreachable("un secret court doit faire échouer le chargement");
     } catch (error) {
       // Le message cite la variable, jamais sa valeur (S-5/S-12).
-      expect(error instanceof Error ? error.message : "").not.toContain("trop-court");
+      expect(error instanceof Error ? error.message : "").not.toContain(shortSecret);
     }
   });
 

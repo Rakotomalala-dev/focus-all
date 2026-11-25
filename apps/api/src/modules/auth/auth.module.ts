@@ -8,7 +8,6 @@ import type { Env } from "../../config/env.schema";
 // vérification : secret, issuer, audience et algorithme.
 @Module({
   imports: [
-    AppConfigModule,
     JwtModule.registerAsync({
       imports: [AppConfigModule],
       inject: [APP_ENV],

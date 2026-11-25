@@ -1,6 +1,3 @@
-import { NestFactory } from "@nestjs/core";
-import { JwtService } from "@nestjs/jwt";
-import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import {
   problemDetailsSchema,
   taskListResponseSchema,
@@ -8,56 +5,31 @@ import {
   type TaskListResponse,
 } from "@focus/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AppModule } from "../../app.module";
-import { applyHttpConfig } from "../../config/http";
+import {
+  startTestApi,
+  TEST_USER_ID,
+  TEST_WORKSPACE_ID,
+  type HttpResult,
+  type RequestOptions,
+  type TestApi,
+} from "../../testing/test-api";
 
 // Test d'intégration HTTP : la vraie application Nest + Fastify, sans mock du
 // filtre. Les cas sont ordonnés (vide -> contenu -> erreurs, puis pagination),
 // l'application et son repository en mémoire étant partagés par le fichier.
-// Le secret et le workspace de test sont locaux au fichier : le guard vérifie
-// la signature, donc chaque requête porte un vrai jeton (aucun contournement
-// de l'authentification dans les tests).
-const JWT_SECRET = "test-secret-0000000000000000000000000000";
-const WORKSPACE_ID = "018f3b3c-1a2b-7c3d-8e4f-0a1b2c3d4e5f";
-const USER_ID = "018f3b3c-1a2b-7c3d-8e4f-444444444444";
-
-let app: NestFastifyApplication;
-let baseUrl = "";
+// Chaque requête porte un vrai jeton : aucun test ne contourne le guard.
+let api: TestApi;
 let authorization = "";
 
-type HttpResult = {
-  readonly status: number;
-  readonly contentType: string | null;
-  readonly headers: Headers;
-  readonly body: unknown;
-};
-
-type RequestInitWithHeaders = Omit<RequestInit, "headers"> & { headers?: Record<string, string> };
-
-async function request(path: string, init?: RequestInitWithHeaders): Promise<HttpResult> {
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers: { authorization, ...init?.headers },
-  });
-  const text = await response.text();
-  let body: unknown = null;
-  if (text.length > 0) {
-    body = JSON.parse(text);
-  }
-  return {
-    status: response.status,
-    contentType: response.headers.get("content-type"),
-    headers: response.headers,
-    body,
-  };
+function request(
+  path: string,
+  options?: Omit<RequestOptions, "authorization">,
+): Promise<HttpResult> {
+  return api.request(path, { ...options, authorization });
 }
 
 function postTask(payload: unknown): Promise<HttpResult> {
-  return request("/api/v1/tasks", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  return request("/api/v1/tasks", { method: "POST", body: payload });
 }
 
 // Valider le corps par le contrat vaut mieux qu'un cast : si la réponse dérive,
@@ -67,26 +39,15 @@ function parseList(body: unknown): TaskListResponse {
 }
 
 beforeAll(async () => {
-  process.env.JWT_ACCESS_SECRET = JWT_SECRET;
-  app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
-    logger: false,
+  api = await startTestApi();
+  authorization = await api.bearerToken({
+    userId: TEST_USER_ID,
+    workspaceId: TEST_WORKSPACE_ID,
   });
-  // Même configuration HTTP que `main.ts` : préfixe et CORS viennent de l'env.
-  applyHttpConfig(app);
-  await app.listen(0, "127.0.0.1");
-
-  const address = app.getHttpServer().address();
-  const port = typeof address === "object" && address !== null ? address.port : 0;
-  baseUrl = `http://127.0.0.1:${port}`;
-  // Signé par le JwtService de l'application : issuer, audience et secret sont
-  // ceux que le guard vérifie, sans les redéclarer ici.
-  authorization = `Bearer ${await app
-    .get(JwtService)
-    .signAsync({ workspaceId: WORKSPACE_ID }, { subject: USER_ID })}`;
 });
 
 afterAll(async () => {
-  await app.close();
+  await api.close();
 });
 
 describe("état vide", () => {
@@ -150,8 +111,8 @@ describe("état contenu", () => {
     // La valeur de l'ETag, rejouée en If-Match, doit être acceptée.
     const patched = await request(`/api/v1/tasks/${created.id}`, {
       method: "PATCH",
-      headers: { "content-type": "application/json", "if-match": etag ?? "" },
-      body: JSON.stringify({ title: "via etag" }),
+      headers: { "if-match": etag ?? "" },
+      body: { title: "via etag" },
     });
 
     expect(patched.status).toBe(200);
@@ -174,11 +135,7 @@ describe("état erreur", () => {
   });
 
   it("POST avec un corps non JSON : 400 problem+json, jamais une trace serveur", async () => {
-    const result = await request("/api/v1/tasks", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: "{ pas du json",
-    });
+    const result = await request("/api/v1/tasks", { method: "POST", rawBody: "{ pas du json" });
 
     expect(result.status).toBe(400);
     expect(result.contentType).toContain("application/problem+json");
