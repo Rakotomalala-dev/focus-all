@@ -3,8 +3,13 @@
   "info": {
     "title": "Focus API",
     "version": "1.0.0",
-    "description": "Contrat REST de Focus. Généré depuis `@focus/contracts` par `pnpm api:openapi` — ne pas éditer à la main. Erreurs au format RFC 9457 (`application/problem+json`). Concurrence optimiste : la version attendue vient du corps (`version`) ou de `If-Match` ; une version obsolète donne `409` si elle vient du corps ou de la query, `412` si elle vient de `If-Match`, avec le même code `CONFLICT_VERSION`."
+    "description": "Contrat REST de Focus. Généré depuis `@focus/contracts` par `pnpm api:openapi` — ne pas éditer à la main. Erreurs au format RFC 9457 (`application/problem+json`). Concurrence optimiste : la version attendue vient du corps (`version`) ou de `If-Match` ; une version obsolète donne `409` si elle vient du corps ou de la query, `412` si elle vient de `If-Match`, avec le même code `CONFLICT_VERSION`. Toutes les routes exigent un jeton d'accès JWT, sauf les sondes `/health`."
   },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
   "paths": {
     "/api/v1/tasks": {
       "get": {
@@ -70,6 +75,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       },
@@ -120,6 +135,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -160,6 +185,16 @@
           },
           "400": {
             "description": "Identifiant qui n'est pas un UUID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -243,6 +278,16 @@
               }
             }
           },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Tâche introuvable dans ce workspace",
             "content": {
@@ -304,6 +349,16 @@
           },
           "400": {
             "description": "Identifiant invalide ou version attendue absente",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -687,6 +742,7 @@
             "enum": [
               "VALIDATION_FAILED",
               "UNAUTHENTICATED",
+              "SESSION_EXPIRED",
               "FORBIDDEN",
               "NOT_FOUND",
               "REQUEST_REJECTED",
@@ -720,6 +776,14 @@
           "code"
         ],
         "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Jeton d'accès JWT (`Authorization: Bearer …`). `workspaceId` et `userId` viennent de ses claims, jamais du corps ni de la query. Absent ou invalide → `401 UNAUTHENTICATED` ; expiré → `401 SESSION_EXPIRED`."
       }
     }
   }

@@ -37,6 +37,19 @@ const problemResponse = (description) => ({
   content: { [contracts.PROBLEM_CONTENT_TYPE]: { schema: ref("ProblemDetails") } },
 });
 
+// Authentification unique de l'API (ADR-010) : jeton d'accès JWT. Le jeton de
+// rafraîchissement n'apparaît pas ici : `POST /auth/*` n'existe pas encore.
+const BEARER_AUTH = {
+  type: "http",
+  scheme: "bearer",
+  bearerFormat: "JWT",
+  description:
+    "Jeton d'accès JWT (`Authorization: Bearer …`). `workspaceId` et `userId` viennent de ses claims, " +
+    "jamais du corps ni de la query. Absent ou invalide → `401 UNAUTHENTICATED` ; expiré → `401 SESSION_EXPIRED`.",
+};
+
+const UNAUTHORIZED = problemResponse("Jeton absent, invalide ou expiré");
+
 const etagHeader = {
   description: "Version courante ; à renvoyer tel quel dans `If-Match`.",
   schema: { type: "string", example: '"3"' },
@@ -115,8 +128,12 @@ function buildDocument() {
         "ne pas éditer à la main. Erreurs au format RFC 9457 (`application/problem+json`). " +
         "Concurrence optimiste : la version attendue vient du corps (`version`) ou de " +
         "`If-Match` ; une version obsolète donne `409` si elle vient du corps ou de la query, " +
-        "`412` si elle vient de `If-Match`, avec le même code `CONFLICT_VERSION`.",
+        "`412` si elle vient de `If-Match`, avec le même code `CONFLICT_VERSION`. " +
+        "Toutes les routes exigent un jeton d'accès JWT, sauf les sondes `/health`.",
     },
+    // S'applique à toutes les opérations ; les sondes de santé ne font pas
+    // partie de ce document (elles ne sont pas préfixées `/api/v1`).
+    security: [{ bearerAuth: [] }],
     paths: {
       "/api/v1/tasks": {
         get: {
@@ -146,6 +163,7 @@ function buildDocument() {
               content: { [JSON_CONTENT]: { schema: ref("TaskListResponse") } },
             },
             400: problemResponse("Paramètres invalides"),
+            401: UNAUTHORIZED,
           },
         },
         post: {
@@ -164,6 +182,7 @@ function buildDocument() {
               content: { [JSON_CONTENT]: { schema: ref("Task") } },
             },
             400: problemResponse("Corps invalide"),
+            401: UNAUTHORIZED,
           },
         },
       },
@@ -174,6 +193,7 @@ function buildDocument() {
           responses: {
             200: taskResponse("Tâche demandée"),
             400: problemResponse("Identifiant qui n'est pas un UUID"),
+            401: UNAUTHORIZED,
             404: problemResponse("Tâche introuvable dans ce workspace"),
           },
         },
@@ -187,6 +207,7 @@ function buildDocument() {
           responses: {
             200: taskResponse("Tâche mise à jour, `version` incrémentée"),
             400: problemResponse("Corps invalide ou version attendue absente"),
+            401: UNAUTHORIZED,
             404: problemResponse("Tâche introuvable dans ce workspace"),
             409: problemResponse("Version obsolète fournie dans le corps ou la query"),
             412: problemResponse("Version obsolète fournie via If-Match"),
@@ -198,6 +219,7 @@ function buildDocument() {
           responses: {
             204: { description: "Tâche supprimée, sans corps" },
             400: problemResponse("Identifiant invalide ou version attendue absente"),
+            401: UNAUTHORIZED,
             404: problemResponse("Tâche introuvable dans ce workspace"),
             409: problemResponse("Version obsolète fournie dans la query"),
             412: problemResponse("Version obsolète fournie via If-Match"),
@@ -205,7 +227,10 @@ function buildDocument() {
         },
       },
     },
-    components: { schemas: collectSchemas() },
+    components: {
+      schemas: collectSchemas(),
+      securitySchemes: { bearerAuth: BEARER_AUTH },
+    },
   };
 }
 

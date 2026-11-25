@@ -11,6 +11,9 @@ type DomainErrorParams = {
   readonly "request.missing_version": undefined;
   readonly "request.empty_patch": undefined;
   readonly "request.invalid_cursor": undefined;
+  readonly "auth.missing_token": undefined;
+  readonly "auth.invalid_token": undefined;
+  readonly "auth.session_expired": undefined;
 };
 
 export type DomainErrorKey = keyof DomainErrorParams;
@@ -29,6 +32,9 @@ const CATALOG: Readonly<
   "request.missing_version": { code: "VALIDATION_FAILED", status: 400 },
   "request.empty_patch": { code: "VALIDATION_FAILED", status: 400 },
   "request.invalid_cursor": { code: "VALIDATION_FAILED", status: 400 },
+  "auth.missing_token": { code: "UNAUTHENTICATED", status: 401 },
+  "auth.invalid_token": { code: "UNAUTHENTICATED", status: 401 },
+  "auth.session_expired": { code: "SESSION_EXPIRED", status: 401 },
 };
 
 // Erreur typée du domaine : le service lève, le filtre problem+json traduit en

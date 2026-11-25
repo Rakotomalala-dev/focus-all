@@ -308,7 +308,8 @@ Propriétés importantes :
 
 - **Identifiants UUID v7** générés côté serveur (`src/common/uuid-v7.ts`) : ordonnés dans le temps, comme l'impose ADR-017.
 - **Pagination par curseur *keyset*** : le curseur (`base64url`) transporte la **clé de tri** de la dernière tâche vue — `{ sortOrder, id }` —, jamais un rang. Si une tâche est créée ou déplacée entre deux pages, aucune tâche n'est sautée ni répétée. Un curseur illisible, incomplet ou portant un id non UUID renvoie `400 VALIDATION_FAILED`. La réponse porte `nextCursor: null` en fin de parcours.
-- **`workspaceId` serveur** (`DEV_WORKSPACE_ID`) : jamais lu depuis le corps ou la requête (N-3). À remplacer par le workspace de session dès que l'authentification arrive.
+- **Authentification et workspace de session** : toutes les routes `/api/v1/*` exigent `Authorization: Bearer <jwt>` — seules les sondes `/health` sont publiques (`@Public()`). La garde globale (`AuthGuard`, enregistrée en `APP_GUARD`) vérifie signature, `iss`, `aud` et algorithme (`HS256`) avec `JWT_ACCESS_SECRET` ; un secret absent ou plus court que 32 caractères empêche le démarrage (fail-fast, §4). Elle valide ensuite `sub` et `workspaceId` comme UUID et publie un contexte `{ userId, workspaceId }` : le workspace vient **uniquement** des claims du jeton, jamais du corps ni de la query (N-3/S-2). Le controller le lit via `@CurrentAuth()` et le transmet au service, qui scope le repository. Erreurs : jeton absent ou invalide → `401 UNAUTHENTICATED` (`auth.missing_token` / `auth.invalid_token`) ; jeton expiré → `401 SESSION_EXPIRED` (`auth.session_expired`), distinct pour que le client tente un refresh. `POST /auth/login` et le refresh rotatif (ADR-010) restent **non implémentés** : ils exigent la table utilisateur, donc Prisma.
+- **Jeton de développement** : sans endpoint de connexion, `pnpm api:token <userId> <workspaceId>` signe un jeton local avec `JWT_ACCESS_SECRET` (`apps/api/scripts/dev-token.cjs`) ; aucun secret n'est commité.
 - **Contrôle optimiste obligatoire** : `PATCH` et `DELETE` exigent la version attendue, sous forme de champ `version`, d'en-tête `If-Match` (`3`, `"3"` ou `W/"3"`) ou de query `version`. Sans elle : `400 VALIDATION_FAILED` — jamais d'écrasement silencieux. Si le corps porte une version **et** un `If-Match`, le corps gagne.
 - **En-têtes de version** : chaque `POST`, `GET /:id` et `PATCH` publie `ETag: "<version>"` ; `POST` renvoie aussi `Location: /api/v1/tasks/:id`. Le client renvoie l'`ETag` tel quel dans `If-Match`, sans relire `version` dans le corps.
 - **Statut en cas de version obsolète** — la tâche n'est jamais modifiée :
@@ -322,7 +323,7 @@ Propriétés importantes :
 - **Cloisonnement (N-3/N-7)** : toute lecture et toute mutation sont scopées par le workspace de la session, jamais par le corps ou la query. Le repository détient un `StoredTask` (entité + `workspaceId`) et ne rend que `Task`, dont le workspace est **absent du contrat public** : une fuite devient une erreur de compilation. Une tâche d'un autre workspace est indistinguable d'une tâche absente — `404`, jamais `403`, et le `404` prime sur le `409` même avec une version obsolète. Couvert par `tasks.security.spec.ts` (tests négatifs exigés par AGENTS §8).
 - **Repository en mémoire** (`InMemoryTaskRepository`) : aucune persistance, données perdues au redémarrage, suppression physique. Il implémente le port `TaskRepository` ; passer à Prisma ne changera que le `useClass` du module (et introduira la suppression logique et la transaction du `SyncChange`).
 
-Tests : `tasks.service.spec.ts` (cas métier, pagination, erreurs) et `tasks.http.spec.ts` (vraie application Nest + Fastify sur un port éphémère, réponses validées par les schémas du contrat : états vide, contenu, erreur 400/404, pagination).
+Tests : `tasks.service.spec.ts` (cas métier, pagination, erreurs), `tasks.http.spec.ts` et `tasks.mutations.http.spec.ts` (vraie application Nest + Fastify sur un port éphémère, jetons réels, réponses validées par les schémas du contrat : états vide, contenu, erreurs 400/404/409/412, pagination) et `tasks.auth.http.spec.ts` (401 sans jeton, schéma non Bearer, signature étrangère, jeton expiré, claim manquant, `workspaceId` injecté dans le corps ignoré, lecture et mutation refusées entre deux workspaces, sondes publiques).
 
 ---
 
@@ -355,6 +356,7 @@ packages:
 | `pnpm test:watch` | paquet | mode watch |
 | `pnpm api:openapi` | `apps/api` | **existe** — génère `apps/api/openapi.json` depuis les schémas de `@focus/contracts` |
 | `pnpm api:openapi:check` | `apps/api` | **existe** — échoue si `openapi.json` a dérivé des schémas (utilisé en CI) |
+| `pnpm api:token` | `apps/api` | **existe** — signe un jeton d'accès local (`JWT_ACCESS_SECRET` requis) pour appeler l'API à la main |
 | `pnpm test:integration` | `apps/api` | à venir — M1, avec Postgres éphémère (Docker) |
 | `pnpm test:e2e:web` | racine | à venir — Playwright pas encore installé |
 | `pnpm test:e2e:mobile` | racine | à venir — Maestro pas encore installé |
@@ -586,6 +588,8 @@ sequenceDiagram
 ```
 
 **Réutilisation détectée** : si un refresh token déjà consommé est présenté, l'API révoque toutes les sessions de la `familyId`, journalise l'événement et renvoie `401 SESSION_REVOKED`. Aucun token n'est jamais stocké en clair.
+
+**État implémenté (2026-11-25).** Seul le maillon de **vérification** existe : `AuthGuard` global (`apps/api/src/auth/`), jeton d'accès JWT, contexte `{ userId, workspaceId }` issu des claims, `401` typés. Le flux ci-dessus reste la cible : `POST /auth/login`, `POST /auth/refresh`, la table `Session` et Argon2id ne sont pas écrits — ils dépendent de Prisma et d'un stockage utilisateur. Conséquence assumée : aucun jeton ne peut être obtenu depuis l'API ; en développement, `pnpm api:token` en signe un hors ligne. `errorCodeSchema` contient en revanche `SESSION_EXPIRED`, déjà renvoyé sur un jeton expiré.
 
 ### 6.3 Exemples d'appels
 

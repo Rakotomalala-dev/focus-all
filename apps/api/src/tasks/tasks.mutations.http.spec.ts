@@ -1,4 +1,5 @@
 import { NestFactory } from "@nestjs/core";
+import { JwtService } from "@nestjs/jwt";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import {
   problemDetailsSchema,
@@ -12,8 +13,15 @@ import { AppModule } from "../app.module";
 // Même approche que tasks.http.spec.ts : vraie application Nest + Fastify,
 // réponses validées par les schémas du contrat. Chaque test crée sa propre
 // tâche pour ne dépendre d'aucun état laissé par un autre.
+// Même secret et même workspace que tasks.http.spec.ts, propres à ce fichier :
+// les tests passent par le vrai guard, avec un jeton signé.
+const JWT_SECRET = "test-secret-0000000000000000000000000000";
+const WORKSPACE_ID = "018f3b3c-1a2b-7c3d-8e4f-0a1b2c3d4e5f";
+const USER_ID = "018f3b3c-1a2b-7c3d-8e4f-444444444444";
+
 let app: NestFastifyApplication;
 let baseUrl = "";
+let authorization = "";
 
 type HttpResult = {
   readonly status: number;
@@ -22,8 +30,13 @@ type HttpResult = {
   readonly body: unknown;
 };
 
-async function request(path: string, init?: RequestInit): Promise<HttpResult> {
-  const response = await fetch(`${baseUrl}${path}`, init);
+type RequestInitWithHeaders = Omit<RequestInit, "headers"> & { headers?: Record<string, string> };
+
+async function request(path: string, init?: RequestInitWithHeaders): Promise<HttpResult> {
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: { authorization, ...init?.headers },
+  });
   const text = await response.text();
   let body: unknown = null;
   if (text.length > 0) {
@@ -66,6 +79,7 @@ function remove(id: string, version?: number, ifMatch?: string): Promise<HttpRes
 }
 
 beforeAll(async () => {
+  process.env.JWT_ACCESS_SECRET = JWT_SECRET;
   app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
     logger: false,
   });
@@ -75,6 +89,9 @@ beforeAll(async () => {
   const address = app.getHttpServer().address();
   const port = typeof address === "object" && address !== null ? address.port : 0;
   baseUrl = `http://127.0.0.1:${port}`;
+  authorization = `Bearer ${await app
+    .get(JwtService)
+    .signAsync({ workspaceId: WORKSPACE_ID }, { subject: USER_ID })}`;
 });
 
 afterAll(async () => {

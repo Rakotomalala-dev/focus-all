@@ -24,6 +24,7 @@
     "test": "turbo run test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "api:token": "pnpm --filter @focus/api api:token",
     "api:openapi": "pnpm --filter @focus/api api:openapi",
     "api:openapi:check": "pnpm --filter @focus/api api:openapi:check",
     "docker:up": "docker compose -f docker/compose.yml up -d",

@@ -6,6 +6,9 @@ import { z } from "zod";
 export const ERROR_CODES = [
   "VALIDATION_FAILED",
   "UNAUTHENTICATED",
+  // Jeton d'accès expiré : le client tente un refresh, contrairement à un
+  // jeton absent ou invalide qui impose une reconnexion (doc 03 §6.2).
+  "SESSION_EXPIRED",
   "FORBIDDEN",
   "NOT_FOUND",
   "REQUEST_REJECTED",

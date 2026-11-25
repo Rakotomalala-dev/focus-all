@@ -14,6 +14,8 @@ import {
 } from "@nestjs/common";
 import type { FastifyReply } from "fastify";
 import type { Task, TaskListResponse } from "@focus/contracts";
+import type { AuthContext } from "../auth/auth-context";
+import { CurrentAuth } from "../auth/current-auth.decorator";
 import { TasksService } from "./tasks.service";
 
 // La version est publiée en `ETag` : c'est la source que le client renvoie
@@ -31,26 +33,28 @@ export class TasksController {
 
   @Post()
   async create(
+    @CurrentAuth() auth: AuthContext,
     @Body() body: unknown,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<Task> {
-    const task = await this.tasks.create(body);
+    const task = await this.tasks.create(auth, body);
     reply.header("location", `/api/v1/tasks/${task.id}`);
     publishVersion(reply, task);
     return task;
   }
 
   @Get()
-  list(@Query() query: unknown): Promise<TaskListResponse> {
-    return this.tasks.list(query);
+  list(@CurrentAuth() auth: AuthContext, @Query() query: unknown): Promise<TaskListResponse> {
+    return this.tasks.list(auth, query);
   }
 
   @Get(":id")
   async findById(
+    @CurrentAuth() auth: AuthContext,
     @Param("id") id: string,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<Task> {
-    const task = await this.tasks.findById(id);
+    const task = await this.tasks.findById(auth, id);
     publishVersion(reply, task);
     return task;
   }
@@ -58,12 +62,13 @@ export class TasksController {
   // La version attendue peut venir du corps (`version`) ou d'`If-Match`.
   @Patch(":id")
   async update(
+    @CurrentAuth() auth: AuthContext,
     @Param("id") id: string,
     @Body() body: unknown,
     @Headers("if-match") ifMatch: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<Task> {
-    const task = await this.tasks.update(id, body, ifMatch);
+    const task = await this.tasks.update(auth, id, body, ifMatch);
     publishVersion(reply, task);
     return task;
   }
@@ -72,10 +77,11 @@ export class TasksController {
   @Delete(":id")
   @HttpCode(204)
   async remove(
+    @CurrentAuth() auth: AuthContext,
     @Param("id") id: string,
     @Query() query: unknown,
     @Headers("if-match") ifMatch: string | undefined,
   ): Promise<void> {
-    await this.tasks.remove(id, query, ifMatch);
+    await this.tasks.remove(auth, id, query, ifMatch);
   }
 }

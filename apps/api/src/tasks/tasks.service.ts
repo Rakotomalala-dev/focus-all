@@ -9,7 +9,7 @@ import {
   type TaskListResponse,
 } from "@focus/contracts";
 import { DomainError } from "../common/domain-error";
-import { DEV_WORKSPACE_ID } from "./dev-workspace";
+import type { AuthContext } from "../auth/auth-context";
 import {
   TASK_REPOSITORY,
   type MutationResult,
@@ -109,17 +109,17 @@ function decodeCursor(cursor: string): TaskCursor {
 export class TasksService {
   constructor(@Inject(TASK_REPOSITORY) private readonly tasks: TaskRepository) {}
 
-  async create(rawBody: unknown): Promise<Task> {
+  async create(auth: AuthContext, rawBody: unknown): Promise<Task> {
     const parsed = taskDraftSchema.safeParse(rawBody);
     if (!parsed.success) {
       throw new BadRequestException(describeIssues(parsed.error.issues));
     }
-    return this.tasks.create(parsed.data, DEV_WORKSPACE_ID);
+    return this.tasks.create(parsed.data, auth.workspaceId);
   }
 
-  async findById(rawId: string): Promise<Task> {
+  async findById(auth: AuthContext, rawId: string): Promise<Task> {
     const id = this.parseId(rawId);
-    const task = await this.tasks.findById(id, DEV_WORKSPACE_ID);
+    const task = await this.tasks.findById(id, auth.workspaceId);
     if (task === undefined) {
       throw new DomainError("task.not_found");
     }
@@ -151,7 +151,12 @@ export class TasksService {
     return result.task;
   }
 
-  async update(rawId: string, rawBody: unknown, ifMatch: string | undefined): Promise<Task> {
+  async update(
+    auth: AuthContext,
+    rawId: string,
+    rawBody: unknown,
+    ifMatch: string | undefined,
+  ): Promise<Task> {
     const id = this.parseId(rawId);
     const parsed = taskUpdateSchema.safeParse(rawBody);
     if (!parsed.success) {
@@ -176,12 +181,17 @@ export class TasksService {
     }
 
     return this.applyMutation(
-      await this.tasks.update(id, DEV_WORKSPACE_ID, patch, expected.version),
+      await this.tasks.update(id, auth.workspaceId, patch, expected.version),
       expected.source,
     );
   }
 
-  async remove(rawId: string, rawQuery: unknown, ifMatch: string | undefined): Promise<void> {
+  async remove(
+    auth: AuthContext,
+    rawId: string,
+    rawQuery: unknown,
+    ifMatch: string | undefined,
+  ): Promise<void> {
     const id = this.parseId(rawId);
     const parsed = versionQuerySchema.safeParse(rawQuery);
     if (!parsed.success) {
@@ -190,12 +200,12 @@ export class TasksService {
 
     const expected = resolveExpectedVersion(parsed.data.version, ifMatch);
     this.applyMutation(
-      await this.tasks.remove(id, DEV_WORKSPACE_ID, expected.version),
+      await this.tasks.remove(id, auth.workspaceId, expected.version),
       expected.source,
     );
   }
 
-  async list(rawQuery: unknown): Promise<TaskListResponse> {
+  async list(auth: AuthContext, rawQuery: unknown): Promise<TaskListResponse> {
     const parsed = taskListQuerySchema.safeParse(rawQuery);
     if (!parsed.success) {
       throw new BadRequestException(describeIssues(parsed.error.issues));
@@ -212,7 +222,7 @@ export class TasksService {
 
     const page = await this.tasks.list(
       filters,
-      DEV_WORKSPACE_ID,
+      auth.workspaceId,
       after === undefined ? { limit } : { limit, after },
     );
     const last = page.items.at(-1);
