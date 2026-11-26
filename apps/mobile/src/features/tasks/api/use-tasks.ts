@@ -1,6 +1,7 @@
 import type { Task, TaskDraftInput, TaskStatus } from "@focus/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taskRepository } from "../../../data/tasks/task-repository-instance";
+import type { TaskPatchInput } from "../../../data/tasks/task-repository";
 
 // Une mutation n'invalide que la liste des tâches, jamais tout le cache (ADR-007).
 const TASK_LIST_KEY = ["tasks", "list"] as const;
@@ -16,6 +17,17 @@ export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (draft: TaskDraftInput) => taskRepository.create(draft),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: TASK_LIST_KEY });
+    },
+  });
+}
+
+export function useUpdateTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ task, patch }: { readonly task: Task; readonly patch: TaskPatchInput }) =>
+      taskRepository.update(task, patch),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: TASK_LIST_KEY });
     },

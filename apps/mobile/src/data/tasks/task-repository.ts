@@ -9,6 +9,7 @@ import {
   type TaskListQuery,
   type TaskListResponse,
   type TaskStatus,
+  type TaskUpdate,
 } from "@focus/contracts";
 import type { HttpClient, HttpQuery } from "../http/client";
 
@@ -16,10 +17,13 @@ import type { HttpClient, HttpQuery } from "../http/client";
 // (doc 01 §7.3), et chaque réponse est validée par le contrat partagé.
 export const TASKS_PATH = "/tasks";
 
+export type TaskPatchInput = Omit<TaskUpdate, "version">;
+
 export type TaskRepository = {
   readonly list: (query?: TaskListQuery) => Promise<TaskListResponse>;
   readonly create: (draft: TaskDraftInput) => Promise<Task>;
   readonly setStatus: (task: Task, status: TaskStatus) => Promise<Task>;
+  readonly update: (task: Task, patch: TaskPatchInput) => Promise<Task>;
 };
 
 export function createTaskRepository(http: HttpClient): TaskRepository {
@@ -38,6 +42,11 @@ export function createTaskRepository(http: HttpClient): TaskRepository {
       // La version du corps suffit : le serveur répond 409 CONFLICT_VERSION si
       // elle est obsolète, sans dépendre d'un ETag mémorisé côté client.
       const payload = taskUpdateSchema.parse({ status, version: task.version });
+      return http.patch(`${TASKS_PATH}/${task.id}`, payload, taskSchema);
+    },
+
+    update: async (task, patch) => {
+      const payload = taskUpdateSchema.parse({ ...patch, version: task.version });
       return http.patch(`${TASKS_PATH}/${task.id}`, payload, taskSchema);
     },
   };

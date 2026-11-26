@@ -7,10 +7,11 @@ import { formatDueDate } from "../utils/format-due-date";
 export type TaskCardProps = {
   readonly task: Task;
   readonly onToggle: (task: Task) => void;
+  readonly onOpen?: (task: Task) => void;
   readonly isPending: boolean;
 };
 
-export function TaskCard({ task, onToggle, isPending }: TaskCardProps) {
+export function TaskCard({ task, onToggle, onOpen, isPending }: TaskCardProps) {
   const theme = useFocusTheme();
   const { t, i18n } = useTranslation();
   const isDone = task.status === "DONE";
@@ -60,7 +61,12 @@ export function TaskCard({ task, onToggle, isPending }: TaskCardProps) {
         />
       </Pressable>
 
-      <View style={{ flex: 1, gap: theme.spacing.xs }}>
+      <Pressable
+        accessibilityRole={onOpen === undefined ? undefined : "button"}
+        accessibilityLabel={onOpen === undefined ? undefined : t("tasks.card.open", { title: task.title })}
+        onPress={onOpen === undefined ? undefined : () => onOpen(task)}
+        style={{ flex: 1, gap: theme.spacing.xs, minHeight: 44, justifyContent: "center" }}
+      >
         <AppText
           style={
             isDone
@@ -76,7 +82,7 @@ export function TaskCard({ task, onToggle, isPending }: TaskCardProps) {
             {t("tasks.dueDate", { date: formatDueDate(task.dueDate, i18n.language) })}
           </AppText>
         )}
-      </View>
+      </Pressable>
     </View>
   );
 }

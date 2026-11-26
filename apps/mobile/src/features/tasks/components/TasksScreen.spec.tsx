@@ -14,6 +14,15 @@ const mocks = vi.hoisted(() => ({
 
 // Les hooks TanStack Query sont le seul point d'entrée serveur de l'écran :
 // les mocker garde le test de composant pur, sans réseau ni cache.
+vi.mock("expo-router", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+vi.mock("../../auth/api/use-auth", () => ({
+  useSession: () => ({ user: null }),
+  useLogout: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 vi.mock("../api/use-tasks", () => ({
   useTasks: () => mocks.useTasks(),
   useCreateTask: () => ({
