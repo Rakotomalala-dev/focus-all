@@ -25,6 +25,17 @@ const COMPONENTS = {
   TaskUpdate: contracts.taskUpdateSchema,
   TaskListResponse: contracts.taskListResponseSchema,
   ProblemDetails: contracts.problemDetailsSchema,
+  AuthTokens: contracts.authTokensSchema,
+  RegisterInput: contracts.registerInputSchema,
+  LoginInput: contracts.loginInputSchema,
+  RefreshInput: contracts.refreshInputSchema,
+  MeResponse: contracts.meResponseSchema,
+  SyncMutation: contracts.syncMutationSchema,
+  SyncPushRequest: contracts.syncPushRequestSchema,
+  SyncPushResponse: contracts.syncPushResponseSchema,
+  SyncChange: contracts.syncChangeSchema,
+  SyncPullResponse: contracts.syncPullResponseSchema,
+  SyncSnapshotResponse: contracts.syncSnapshotResponseSchema,
 };
 
 const UUID = { type: "string", format: "uuid" };
@@ -37,8 +48,8 @@ const problemResponse = (description) => ({
   content: { [contracts.PROBLEM_CONTENT_TYPE]: { schema: ref("ProblemDetails") } },
 });
 
-// Authentification unique de l'API (ADR-010) : jeton d'accès JWT. Le jeton de
-// rafraîchissement n'apparaît pas ici : `POST /auth/*` n'existe pas encore.
+// Authentification unique de l'API (ADR-010) : jeton d'accès JWT. Le refresh
+// token est opaque, échangé uniquement sur `/auth/refresh` et `/auth/logout`.
 const BEARER_AUTH = {
   type: "http",
   scheme: "bearer",
@@ -135,6 +146,141 @@ function buildDocument() {
     // partie de ce document (elles ne sont pas préfixées `/api/v1`).
     security: [{ bearerAuth: [] }],
     paths: {
+      "/api/v1/auth/register": {
+        post: {
+          summary: "Inscrire un compte et créer son workspace personnel",
+          security: [],
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("RegisterInput") } },
+          },
+          responses: {
+            201: {
+              description: "Compte créé, jetons d'accès et de rafraîchissement",
+              content: { [JSON_CONTENT]: { schema: ref("AuthTokens") } },
+            },
+            400: problemResponse("Corps invalide"),
+            409: problemResponse("E-mail déjà utilisé"),
+          },
+        },
+      },
+      "/api/v1/auth/login": {
+        post: {
+          summary: "Se connecter par e-mail et mot de passe",
+          security: [],
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("LoginInput") } },
+          },
+          responses: {
+            200: {
+              description: "Jetons émis",
+              content: { [JSON_CONTENT]: { schema: ref("AuthTokens") } },
+            },
+            400: problemResponse("Corps invalide"),
+            401: problemResponse("Identifiants invalides"),
+          },
+        },
+      },
+      "/api/v1/auth/refresh": {
+        post: {
+          summary: "Faire tourner le refresh token",
+          security: [],
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("RefreshInput") } },
+          },
+          responses: {
+            200: {
+              description: "Nouveaux jetons ; l'ancien refresh token est révoqué",
+              content: { [JSON_CONTENT]: { schema: ref("AuthTokens") } },
+            },
+            400: problemResponse("Corps invalide"),
+            401: problemResponse("Refresh token inconnu, expiré ou déjà consommé"),
+          },
+        },
+      },
+      "/api/v1/auth/logout": {
+        post: {
+          summary: "Révoquer la session courante",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("RefreshInput") } },
+          },
+          responses: {
+            204: { description: "Session révoquée, sans corps" },
+            400: problemResponse("Corps invalide"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/me": {
+        get: {
+          summary: "Profil et workspaces de l'utilisateur courant",
+          responses: {
+            200: {
+              description: "Profil courant",
+              content: { [JSON_CONTENT]: { schema: ref("MeResponse") } },
+            },
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/sync/pull": {
+        get: {
+          summary: "Tirer les changements depuis un curseur",
+          parameters: [
+            {
+              name: "since",
+              in: "query",
+              description: "Curseur du journal (0 = depuis le début).",
+              schema: { type: "integer", minimum: 0, default: 0 },
+            },
+            {
+              name: "limit",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 500, default: 500 },
+            },
+          ],
+          responses: {
+            200: {
+              description: "Changements ordonnés par curseur croissant",
+              content: { [JSON_CONTENT]: { schema: ref("SyncPullResponse") } },
+            },
+            400: problemResponse("Curseur ou limite invalide"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/sync/push": {
+        post: {
+          summary: "Pousser un lot de mutations hors ligne",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("SyncPushRequest") } },
+          },
+          responses: {
+            200: {
+              description: "Un résultat par mutation (`applied`, `conflict`, `rejected`)",
+              content: { [JSON_CONTENT]: { schema: ref("SyncPushResponse") } },
+            },
+            400: problemResponse("Lot invalide"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/sync/snapshot": {
+        get: {
+          summary: "Instantané complet du workspace",
+          responses: {
+            200: {
+              description: "Tâches non supprimées et curseur courant",
+              content: { [JSON_CONTENT]: { schema: ref("SyncSnapshotResponse") } },
+            },
+            401: UNAUTHORIZED,
+          },
+        },
+      },
       "/api/v1/tasks": {
         get: {
           summary: "Lister les tâches du workspace courant",
