@@ -147,6 +147,7 @@ export class PrismaTaskRepository implements TaskRepository {
         data: {
           ...(patch.title === undefined ? {} : { title: patch.title }),
           ...(patch.description === undefined ? {} : { description: patch.description }),
+          // `null` est explicite : la tâche revient dans l'Inbox.
           ...(patch.projectId === undefined ? {} : { projectId: patch.projectId }),
           ...(patch.dueDate === undefined ? {} : { dueDate: toDateOnly(patch.dueDate) }),
           ...(patch.priority === undefined ? {} : { priority: patch.priority }),

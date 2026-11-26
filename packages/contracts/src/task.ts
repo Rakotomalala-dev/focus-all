@@ -73,7 +73,8 @@ export type TaskListQuery = z.output<typeof taskListQuerySchema>;
 export const taskUpdateSchema = z.object({
   title: taskTitleSchema.optional(),
   description: z.string().max(MAX_TASK_DESCRIPTION_LENGTH).optional(),
-  projectId: uuidSchema.optional(),
+  // `null` replace la tâche dans l'Inbox ; omis, le projet ne change pas.
+  projectId: uuidSchema.nullable().optional(),
   dueDate: isoDateSchema.optional(),
   priority: taskPrioritySchema.optional(),
   tagIds: z.array(uuidSchema).max(MAX_TASK_TAGS).optional(),

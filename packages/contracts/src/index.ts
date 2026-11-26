@@ -3,5 +3,6 @@
 export * from "./auth";
 export * from "./error-codes";
 export * from "./problem-details";
+export * from "./project";
 export * from "./sync";
 export * from "./task";

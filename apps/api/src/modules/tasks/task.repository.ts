@@ -41,7 +41,8 @@ export type TaskPageResult = {
 export type TaskPatch = {
   readonly title?: string;
   readonly description?: string;
-  readonly projectId?: string;
+  // `null` remet la tâche dans l'Inbox ; `undefined` ne change rien.
+  readonly projectId?: string | null;
   readonly dueDate?: string;
   readonly priority?: TaskPriority;
   readonly tagIds?: readonly string[];
@@ -191,7 +192,9 @@ export class InMemoryTaskRepository implements TaskRepository {
     // Les champs optionnels sont ajoutés seulement quand ils ont une valeur
     // (`exactOptionalPropertyTypes` interdit de les mettre à `undefined`).
     const description = patch.description ?? existing.description;
-    const projectId = patch.projectId ?? existing.projectId;
+    // `null` est une valeur métier (retour à l'Inbox), pas une absence.
+    const projectId =
+      patch.projectId === undefined ? existing.projectId : (patch.projectId ?? undefined);
     const dueDate = patch.dueDate ?? existing.dueDate;
 
     const next: StoredTask = {

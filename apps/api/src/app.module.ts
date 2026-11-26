@@ -6,11 +6,20 @@ import { DatabaseModule } from "./database/database.module";
 import { AuthGuard } from "./modules/auth/auth.guard";
 import { AuthModule } from "./modules/auth/auth.module";
 import { HealthModule } from "./modules/health/health.module";
+import { ProjectsModule } from "./modules/projects/projects.module";
 import { SyncModule } from "./modules/sync/sync.module";
 import { TasksModule } from "./modules/tasks/tasks.module";
 
 @Module({
-  imports: [AppConfigModule, DatabaseModule, AuthModule, HealthModule, TasksModule, SyncModule],
+  imports: [
+    AppConfigModule,
+    DatabaseModule,
+    AuthModule,
+    HealthModule,
+    ProjectsModule,
+    TasksModule,
+    SyncModule,
+  ],
   providers: [
     // Guard global : authentification par défaut de toute route, `@Public()`
     // pour les sondes. Le workspace vient du jeton, jamais du corps (N-3).

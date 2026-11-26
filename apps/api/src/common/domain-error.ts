@@ -7,6 +7,10 @@ type DomainErrorParams = {
   readonly "task.not_found": undefined;
   readonly "task.version_mismatch": { readonly currentVersion: number };
   readonly "task.version_precondition_failed": { readonly currentVersion: number };
+  readonly "project.not_found": undefined;
+  readonly "project.name_taken": undefined;
+  readonly "project.version_mismatch": { readonly currentVersion: number };
+  readonly "project.version_precondition_failed": { readonly currentVersion: number };
   readonly "request.invalid_field": { readonly field: string };
   readonly "request.missing_version": undefined;
   readonly "request.empty_patch": undefined;
@@ -33,6 +37,10 @@ const CATALOG: Readonly<
   "task.not_found": { code: "NOT_FOUND", status: 404 },
   "task.version_mismatch": { code: "CONFLICT_VERSION", status: 409 },
   "task.version_precondition_failed": { code: "CONFLICT_VERSION", status: 412 },
+  "project.not_found": { code: "NOT_FOUND", status: 404 },
+  "project.name_taken": { code: "REQUEST_REJECTED", status: 409 },
+  "project.version_mismatch": { code: "CONFLICT_VERSION", status: 409 },
+  "project.version_precondition_failed": { code: "CONFLICT_VERSION", status: 412 },
   "request.invalid_field": { code: "VALIDATION_FAILED", status: 400 },
   "request.missing_version": { code: "VALIDATION_FAILED", status: 400 },
   "request.empty_patch": { code: "VALIDATION_FAILED", status: 400 },
