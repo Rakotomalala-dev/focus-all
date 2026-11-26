@@ -5,7 +5,7 @@
 > **Public :** développeurs, DevOps, QA, agents IA contributeurs
 > **Documents liés :** [01-ARCHITECTURE.md](./01-ARCHITECTURE.md) · [02-CAHIER-DES-CHARGES.md](./02-CAHIER-DES-CHARGES.md) · [04-BEST-PRACTICES.md](./04-BEST-PRACTICES.md) · [05-SKILLS-AND-TOOLS.md](./05-SKILLS-AND-TOOLS.md)
 
-> **Avertissement d'état (2026-11-25).** Le socle **M0** est terminé : monorepo pnpm + Turborepo, configuration racine, `packages/config`, API NestJS/Fastify avec Prisma (migration initiale + seed), authentification complète (inscription, connexion, rotation de refresh, déconnexion, `/me`), CRUD tâches persistant et protocole de sync (`/sync/pull`, `/sync/push`, `/sync/snapshot`) couvert par des tests de convergence, et app Expo (SDK 52). Redis, les jobs BullMQ, les pièces jointes, les notifications et les fonctionnalités M1 restent à implémenter : les sections correspondantes décrivent la **cible**.
+> **Avertissement d'état (2026-11-26).** Le socle **M0** est terminé : monorepo pnpm + Turborepo, configuration racine, `packages/config`, API NestJS/Fastify avec Prisma (migrations + seed), authentification complète (inscription, connexion, rotation de refresh, déconnexion, `/me`), CRUD tâches persistant, CRUD projets (RF-10 : unicité insensible à la casse, version optimiste, soft delete) et protocole de sync (`/sync/pull`, `/sync/push`, `/sync/snapshot`) couvert par des tests de convergence, et app Expo (SDK 52) avec session sécurisée, édition de tâche et écrans projets. Redis, les jobs BullMQ, les pièces jointes, les notifications et le reste des fonctionnalités M1 (vues, rappels, offline) restent à implémenter : les sections correspondantes décrivent la **cible**.
 >
 > Vérifications **réellement exécutées** sur ce dépôt : `pnpm install` (lockfile `9.0`), `pnpm typecheck` (2 tâches, code 0), `pnpm lint` (0 avertissement, code 0), `pnpm test` (1 fichier, 2 tests passés, code 0), `pnpm --filter @focus/api build` (code 0), API démarrée puis `GET /health` et `GET /health/ready` → `200` (`database`/`redis` = `not_configured`), et `pnpm --filter @focus/mobile build:web` → `Exported: dist`, 3 routes statiques, code 0.
 >
@@ -207,7 +207,7 @@ pnpm db:generate           # régénère le client après un changement de sché
 pnpm db:seed               # jeu de données de développement
 ```
 
-Le schéma livré en M0 (`apps/api/prisma/schema.prisma`) contient `User`, `Session`, `Workspace`, `WorkspaceMember`, `Project`, `Task` et `SyncChange`. La migration initiale (`20261125052005_init`) crée l'extension `citext` pour l'unicité insensible à la casse des e-mails.
+Le schéma (`apps/api/prisma/schema.prisma`) contient `User`, `Session`, `Workspace`, `WorkspaceMember`, `Project`, `Task` et `SyncChange`. La migration initiale (`20261125052005_init`) crée l'extension `citext` pour l'unicité insensible à la casse des e-mails. La migration `20261126090000_add_project_version_soft_delete` ajoute `version` et `deletedAt` à `Project`, ainsi qu'un index unique d'expression `(workspaceId, lower(name))` limité aux projets non supprimés — cet index n'est pas représentable dans le DSL Prisma et vit donc dans le SQL de migration.
 
 Le seed M0 est volontairement minimal et idempotent :
 
@@ -309,11 +309,23 @@ curl -s -X POST http://localhost:4000/api/v1/tasks \
 # 201 → titre rogné, status=TODO, version=0, completedAt=null, tagIds=[]
 ```
 
+### Projets (RF-10)
+
+| Méthode | Route | Corps / paramètres | Réponse |
+|---|---|---|---|
+| `POST` | `/api/v1/projects` | `projectDraftSchema` (`name` 1-80, `color` dans la palette de 12, `description` optionnelle) | `201` + `projectSchema`, `409 REQUEST_REJECTED` si le nom existe déjà (insensible à la casse) |
+| `GET` | `/api/v1/projects` | — | `200` + `{ items }` (projets vivants, archivés compris) |
+| `GET` | `/api/v1/projects/:id` | UUID | `200` + `projectSchema`, `404 NOT_FOUND` sinon |
+| `PATCH` | `/api/v1/projects/:id` | `projectUpdateSchema` + `version` ou `If-Match` | `200` + `projectSchema`, `409`/`412 CONFLICT_VERSION`, `409` si renommage vers un nom pris |
+| `DELETE` | `/api/v1/projects/:id` | `?version=` ou `If-Match` | `204`, soft delete (le nom redevient disponible) |
+
+Archiver/désarchiver passe par `PATCH { "archived": true|false }`. `color: null` et `description: null` effacent le champ ; un champ omis reste inchangé. `DELETE` est logique et **remet les tâches vivantes du projet dans l'Inbox** (`projectId = null`, `version + 1`, `SyncChange` de type `task`), dans la même transaction que le tombstone du projet. Un client hors ligne reçoit donc à la fois la suppression du projet et le déplacement des tâches.
+
 Propriétés importantes :
 
 - **Identifiants UUID v7** générés côté serveur (`src/common/uuid-v7.ts`) : ordonnés dans le temps, comme l'impose ADR-017.
 - **Pagination par curseur *keyset*** : le curseur (`base64url`) transporte la **clé de tri** de la dernière tâche vue — `{ sortOrder, id }` —, jamais un rang. Si une tâche est créée ou déplacée entre deux pages, aucune tâche n'est sautée ni répétée. Un curseur illisible, incomplet ou portant un id non UUID renvoie `400 VALIDATION_FAILED`. La réponse porte `nextCursor: null` en fin de parcours.
-- **Authentification et workspace de session** : toutes les routes `/api/v1/*` exigent `Authorization: Bearer <jwt>` — seules les sondes `/health` sont publiques (`@Public()`). La garde globale (`AuthGuard`, enregistrée en `APP_GUARD`) vérifie signature, `iss`, `aud` et algorithme (`HS256`) avec `JWT_ACCESS_SECRET` ; un secret absent ou plus court que 32 caractères empêche le démarrage (fail-fast, §4). Elle valide ensuite `sub` et `workspaceId` comme UUID et publie un contexte `{ userId, workspaceId }` : le workspace vient **uniquement** des claims du jeton, jamais du corps ni de la query (N-3/S-2). Le controller le lit via `@CurrentAuth()` et le transmet au service, qui scope le repository. Erreurs : jeton absent ou invalide → `401 UNAUTHENTICATED` (`auth.missing_token` / `auth.invalid_token`) ; jeton expiré → `401 SESSION_EXPIRED` (`auth.session_expired`), distinct pour que le client tente un refresh. `POST /auth/login` et le refresh rotatif (ADR-010) restent **non implémentés** : ils exigent la table utilisateur, donc Prisma.
+- **Authentification et workspace de session** : toutes les routes `/api/v1/*` exigent `Authorization: Bearer <jwt>` — seules les sondes `/health` sont publiques (`@Public()`). La garde globale (`AuthGuard`, enregistrée en `APP_GUARD`) vérifie signature, `iss`, `aud` et algorithme (`HS256`) avec `JWT_ACCESS_SECRET` ; un secret absent ou plus court que 32 caractères empêche le démarrage (fail-fast, §4). Elle valide ensuite `sub` et `workspaceId` comme UUID et publie un contexte `{ userId, workspaceId }` : le workspace vient **uniquement** des claims du jeton, jamais du corps ni de la query (N-3/S-2). Le controller le lit via `@CurrentAuth()` et le transmet au service, qui scope le repository. Erreurs : jeton absent ou invalide → `401 UNAUTHENTICATED` (`auth.missing_token` / `auth.invalid_token`) ; jeton expiré → `401 SESSION_EXPIRED` (`auth.session_expired`), distinct pour que le client tente un refresh. `POST /auth/login` et le refresh rotatif (ADR-010) sont implémentés avec Argon2id et la rotation de famille de sessions.
 - **Jeton de développement** : sans endpoint de connexion, `pnpm api:token <userId> <workspaceId>` signe un jeton local avec `JWT_ACCESS_SECRET` (`apps/api/scripts/dev-token.cjs`) ; aucun secret n'est commité.
 - **Contrôle optimiste obligatoire** : `PATCH` et `DELETE` exigent la version attendue, sous forme de champ `version`, d'en-tête `If-Match` (`3`, `"3"` ou `W/"3"`) ou de query `version`. Sans elle : `400 VALIDATION_FAILED` — jamais d'écrasement silencieux. Si le corps porte une version **et** un `If-Match`, le corps gagne.
 - **En-têtes de version** : chaque `POST`, `GET /:id` et `PATCH` publie `ETag: "<version>"` ; `POST` renvoie aussi `Location: /api/v1/tasks/:id`. Le client renvoie l'`ETag` tel quel dans `If-Match`, sans relire `version` dans le corps.
