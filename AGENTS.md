@@ -9,7 +9,7 @@
 
 ## 0. État réel du dépôt
 
-- Le dépôt ne contient **aucun code applicatif** : `.gitignore`, `docs/` et ce fichier. Les commandes décrites dans `docs/03` sont des **cibles M0**, pas des scripts existants.
+- Le dépôt contient le socle M0 : monorepo, `packages/{config,contracts,ui,design-tokens}`, API NestJS + Prisma (auth, tâches, sync, health) et app Expo. Les procédures `docs/03` décrivent l'état réel ; les phases M1+ restent des cibles.
 - Un agent ne doit **jamais** présenter une fonctionnalité comme « existante » ou « testée » sans l'avoir vérifiée par une commande dont il a lu la sortie et le code de sortie.
 - Avant de coder : lire le document concerné (architecture → doc 01, procédure → doc 03, règle de code → doc 04).
 

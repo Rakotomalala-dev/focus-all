@@ -5,7 +5,7 @@
 > **Public :** développeurs, DevOps, QA, agents IA contributeurs
 > **Documents liés :** [01-ARCHITECTURE.md](./01-ARCHITECTURE.md) · [02-CAHIER-DES-CHARGES.md](./02-CAHIER-DES-CHARGES.md) · [04-BEST-PRACTICES.md](./04-BEST-PRACTICES.md) · [05-SKILLS-AND-TOOLS.md](./05-SKILLS-AND-TOOLS.md)
 
-> **Avertissement d'état (2026-11-22).** Le socle **M0** est en place et commité (`806c3df`) : configuration racine (pnpm 9 + Turborepo, `tsconfig.base.json`, ESLint plat, Prettier, `.npmrc`, `.env.example`, `docker/compose.yml`), `packages/config`, squelette `apps/api` (Fastify, préfixe `/api/v1`, `GET /health` et `GET /health/ready`) et squelette `apps/mobile` (Expo SDK 52 + Expo Router, écran unique). Aucune logique métier n'existe encore : les sections §3 à §13 décrivent la procédure **cible** des phases suivantes (Prisma, Redis, authentification, sync, tests, déploiement) et restent à implémenter puis valider.
+> **Avertissement d'état (2026-11-25).** Le socle **M0** est terminé : monorepo pnpm + Turborepo, configuration racine, `packages/config`, API NestJS/Fastify avec Prisma (migration initiale + seed), authentification complète (inscription, connexion, rotation de refresh, déconnexion, `/me`), CRUD tâches persistant et protocole de sync (`/sync/pull`, `/sync/push`, `/sync/snapshot`) couvert par des tests de convergence, et app Expo (SDK 52). Redis, les jobs BullMQ, les pièces jointes, les notifications et les fonctionnalités M1 restent à implémenter : les sections correspondantes décrivent la **cible**.
 >
 > Vérifications **réellement exécutées** sur ce dépôt : `pnpm install` (lockfile `9.0`), `pnpm typecheck` (2 tâches, code 0), `pnpm lint` (0 avertissement, code 0), `pnpm test` (1 fichier, 2 tests passés, code 0), `pnpm --filter @focus/api build` (code 0), API démarrée puis `GET /health` et `GET /health/ready` → `200` (`database`/`redis` = `not_configured`), et `pnpm --filter @focus/mobile build:web` → `Exported: dist`, 3 routes statiques, code 0.
 >
@@ -198,19 +198,24 @@ docker compose -f docker/compose.yml ps
 
 ### 2.4 Base de données
 
+`DATABASE_URL` est lue depuis le `.env` racine (ou `apps/api/.env`) : en développement, `pnpm dev`, `pnpm db:*` et les tests chargent ce fichier via `process.loadEnvFile` (aucune dépendance dotenv). En production et en CI, la variable vient de l'environnement et n'est jamais lue d'un fichier.
+
 ```bash
-pnpm db:migrate      # applique les migrations Prisma
-pnpm db:seed         # jeu de données de développement
+pnpm db:migrate            # prisma migrate dev (création de migration, local)
+pnpm db:migrate:deploy     # prisma migrate deploy (CI, staging, production)
+pnpm db:generate           # régénère le client après un changement de schéma
+pnpm db:seed               # jeu de données de développement
 ```
 
-Le seed crée :
+Le schéma livré en M0 (`apps/api/prisma/schema.prisma`) contient `User`, `Session`, `Workspace`, `WorkspaceMember`, `Project`, `Task` et `SyncChange`. La migration initiale (`20261125052005_init`) crée l'extension `citext` pour l'unicité insensible à la casse des e-mails.
+
+Le seed M0 est volontairement minimal et idempotent :
 
 | Compte | Mot de passe | Contenu |
 |---|---|---|
-| `demo@focus.local` | `Demo1234!` | 3 projets, 42 tâches, 8 tags, 5 tâches récurrentes, rappels |
-| `empty@focus.local` | `Demo1234!` | workspace vide (test des états vides) |
+| `demo@focus.local` | `focus-dev-password` | 1 workspace personnel, 1 projet, 3 tâches |
 
-> Ces identifiants sont **strictement locaux**. Le seed refuse de s'exécuter si `NODE_ENV=production`.
+> Ces identifiants sont **strictement locaux**. Le seed complet (projets multiples, tags, rappels) arrive avec les features correspondantes en M1.
 
 ### 2.5 Démarrage
 
@@ -446,14 +451,14 @@ Un script n'est déclaré dans `package.json` que s'il a une cible : un script r
 | `SYNC_RETENTION_DAYS` | non | `90` | rétention du journal de sync |
 | `FEATURE_FLAGS` | non | — | `eisenhower=false,pomodoro=false` (V1.x) |
 
-**Sous-ensemble validé au démarrage (état réel).** `apps/api/src/config/env.schema.ts` valide, via Zod, les seules variables que l'API lit aujourd'hui : `NODE_ENV`, `PORT`, `API_PREFIX`, `CORS_ORIGINS`, `JWT_ACCESS_SECRET`, `JWT_ACCESS_TTL`, `JWT_ISSUER`, `JWT_AUDIENCE`. Le chargement a lieu une fois, à la création de l'application (`AppConfigModule`) :
+**Sous-ensemble validé au démarrage (état réel).** `apps/api/src/config/env.schema.ts` valide, via Zod, les seules variables que l'API lit aujourd'hui : `NODE_ENV`, `PORT`, `API_PREFIX`, `CORS_ORIGINS`, `JWT_ACCESS_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`, `JWT_ISSUER`, `JWT_AUDIENCE`, `ARGON2_MEMORY_KIB`, `ARGON2_TIME_COST`. `DATABASE_URL` est lue directement par Prisma (client et CLI) et n'est pas dupliquée dans le schéma. Le chargement a lieu une fois, à la création de l'application (`AppConfigModule`) :
 
 - une valeur invalide empêche le boot (fail-fast, R4) ; le message cite la variable et la règle, **jamais sa valeur** (S-5/S-12) ;
 - `PORT` vide retombe sur `4000`, mais un `PORT` non numérique échoue (jamais de port arbitraire) ;
 - `API_PREFIX` doit commencer par `/` et est réellement appliqué (`src/config/http.ts`, partagé par `main.ts` et les tests d'intégration) ; la valeur par défaut `/api/v1` est celle des chemins d'`openapi.json` — la changer impose de régénérer le contrat ;
 - `CORS_ORIGINS` est découpé en liste et nettoyé des entrées vides ; aucune origine permissive n'est ajoutée par défaut.
 
-Les autres lignes du tableau restent la cible : elles seront ajoutées au schéma avec le module qui les consomme (Prisma, Redis, stockage, e-mail, observabilité), et deviendront obligatoires à ce moment-là. `APP_ORIGIN`, `JWT_REFRESH_TTL`, `ARGON2_*` et `DATABASE_URL`/`REDIS_URL` ne sont donc pas encore validés.
+Les autres lignes du tableau restent la cible : elles seront ajoutées au schéma avec le module qui les consomme (Redis, stockage, e-mail, observabilité), et deviendront obligatoires à ce moment-là. `APP_ORIGIN` et `REDIS_URL` ne sont donc pas encore validés par le schéma.
 
 ### 4.3 Variables du client Expo (`apps/mobile/.env`)
 
@@ -609,7 +614,7 @@ sequenceDiagram
 
 **Réutilisation détectée** : si un refresh token déjà consommé est présenté, l'API révoque toutes les sessions de la `familyId`, journalise l'événement et renvoie `401 SESSION_REVOKED`. Aucun token n'est jamais stocké en clair.
 
-**État implémenté (2026-11-25).** Seul le maillon de **vérification** existe : `AuthGuard` global (`apps/api/src/modules/auth/`), jeton d'accès JWT, contexte `{ userId, workspaceId }` issu des claims, `401` typés. Le flux ci-dessus reste la cible : `POST /auth/login`, `POST /auth/refresh`, la table `Session` et Argon2id ne sont pas écrits — ils dépendent de Prisma et d'un stockage utilisateur. Conséquence assumée : aucun jeton ne peut être obtenu depuis l'API ; en développement, `pnpm api:token` en signe un hors ligne. `errorCodeSchema` contient en revanche `SESSION_EXPIRED`, déjà renvoyé sur un jeton expiré.
+**État implémenté (2026-11-25, M0 terminé).** Le flux complet existe et est couvert par `auth.http.spec.ts` sur une vraie base : `POST /auth/register` (utilisateur + workspace personnel + session, e-mail `citext` unique, Argon2id), `POST /auth/login`, `POST /auth/refresh` (rotation, détection de réutilisation et révocation de la famille), `POST /auth/logout`, `GET /me`. Les refresh tokens sont stockés hachés en SHA-256 ; leur valeur en clair n'est jamais persistée ni journalisée. `AuthGuard` reste global et vérifie le JWT d'accès (issuer, audience, algorithme), `@Public()` ouvre les seules routes `register`/`login`/`refresh`. En développement, `pnpm api:token` reste disponible pour signer un jeton hors ligne.
 
 ### 6.3 Exemples d'appels
 
@@ -829,7 +834,9 @@ pnpm test                                   # unitaires + intégration HTTP (tou
 pnpm --filter @focus/api test:watch         # watch sur l'API
 ```
 
-Les commandes suivantes arriveront avec leur cible : `test:integration` exige un Postgres éphémère (M1, Docker), `test:e2e:web` Playwright, `test:e2e:mobile` Maestro. Elles ne sont volontairement pas déclarées dans `package.json` tant qu'elles échoueraient (voir §3.2). Les tests HTTP de `tasks.http.spec.ts` et `tasks.mutations.http.spec.ts` démarrent la vraie application Nest sur un port éphémère : ils couvrent déjà le transport sans base de données.
+Les commandes suivantes arriveront avec leur cible : `test:e2e:web` Playwright, `test:e2e:mobile` Maestro. Elles ne sont volontairement pas déclarées dans `package.json` tant qu'elles échoueraient (voir §3.2).
+
+Les tests HTTP démarrent la vraie application Nest sur un port éphémère et utilisent la **vraie base** : `test/global-setup.ts` vérifie que les migrations sont appliquées (sinon `prisma migrate deploy`), chaque fichier crée ses propres utilisateurs et workspaces (UUID v7) puis les supprime en fin d'exécution. `DATABASE_URL` est donc requis pour `pnpm test`. La CI fournit un service PostgreSQL 16 et le même harnais s'exécute sans Docker local.
 
 ### 8.3 Tests de convergence (obligatoires, sync)
 
@@ -866,7 +873,7 @@ Scénarios minimaux, exécutés en intégration et en E2E :
 
 | Fichier | Déclencheur | Étapes |
 |---|---|---|
-| `.github/workflows/ci.yml` | PR + push sur `main` | setup Node 22 + pnpm, cache, lint, typecheck, tests, build API, build web, openapi check, audit |
+| `.github/workflows/ci.yml` | PR + push sur `main` | setup Node 22 + pnpm, cache, service PostgreSQL 16, lint, typecheck, tests (migrations appliquées par le harnais), seed, build API, build web, openapi check, audit |
 | `.github/workflows/e2e.yml` | PR (label `e2e`) + `main` | build, Playwright, artefacts |
 | `.github/workflows/android.yml` | tag + manuel | EAS Build (profil `preview`/`production`) |
 | `.github/workflows/desktop.yml` | tag | matrice `windows-latest`, `macos-latest`, `ubuntu-22.04` → bundles Tauri + signature |
