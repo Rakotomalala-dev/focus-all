@@ -131,6 +131,9 @@ model Project {
   description String?   @db.Text
   sortOrder   Decimal   @default(1) @db.Decimal(30, 15)
   archivedAt  DateTime? @db.Timestamptz(3)
+  // Contrôle optimiste et tombstone : mêmes règles que `Task` (RF-10).
+  version     Int       @default(0)
+  deletedAt   DateTime? @db.Timestamptz(3)
   createdAt   DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -138,6 +141,7 @@ model Project {
   tasks     Task[]
 
   @@index([workspaceId, archivedAt])
+  @@index([workspaceId, deletedAt])
 }
 
 model Task {
