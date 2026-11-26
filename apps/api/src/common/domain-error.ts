@@ -14,6 +14,11 @@ type DomainErrorParams = {
   readonly "auth.missing_token": undefined;
   readonly "auth.invalid_token": undefined;
   readonly "auth.session_expired": undefined;
+  readonly "auth.invalid_credentials": undefined;
+  readonly "auth.invalid_refresh": undefined;
+  readonly "auth.session_revoked": undefined;
+  readonly "auth.email_taken": undefined;
+  readonly "auth.no_workspace": undefined;
 };
 
 export type DomainErrorKey = keyof DomainErrorParams;
@@ -35,6 +40,11 @@ const CATALOG: Readonly<
   "auth.missing_token": { code: "UNAUTHENTICATED", status: 401 },
   "auth.invalid_token": { code: "UNAUTHENTICATED", status: 401 },
   "auth.session_expired": { code: "SESSION_EXPIRED", status: 401 },
+  "auth.invalid_credentials": { code: "UNAUTHENTICATED", status: 401 },
+  "auth.invalid_refresh": { code: "UNAUTHENTICATED", status: 401 },
+  "auth.session_revoked": { code: "SESSION_REVOKED", status: 401 },
+  "auth.email_taken": { code: "REQUEST_REJECTED", status: 409 },
+  "auth.no_workspace": { code: "FORBIDDEN", status: 403 },
 };
 
 // Erreur typée du domaine : le service lève, le filtre problem+json traduit en

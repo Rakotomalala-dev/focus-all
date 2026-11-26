@@ -9,6 +9,8 @@ export const ERROR_CODES = [
   // Jeton d'accès expiré : le client tente un refresh, contrairement à un
   // jeton absent ou invalide qui impose une reconnexion (doc 03 §6.2).
   "SESSION_EXPIRED",
+  // Refresh token déjà consommé : la famille de sessions a été révoquée.
+  "SESSION_REVOKED",
   "FORBIDDEN",
   "NOT_FOUND",
   "REQUEST_REJECTED",

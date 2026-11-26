@@ -14,8 +14,11 @@ describe("loadEnv", () => {
       CORS_ORIGINS: ["http://localhost:8081"],
       JWT_ACCESS_SECRET: SECRET,
       JWT_ACCESS_TTL: "15m",
+      JWT_REFRESH_TTL: "30d",
       JWT_ISSUER: "focus-api",
       JWT_AUDIENCE: "focus-clients",
+      ARGON2_MEMORY_KIB: 19_456,
+      ARGON2_TIME_COST: 2,
     });
   });
 

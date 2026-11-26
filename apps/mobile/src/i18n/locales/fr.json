@@ -49,6 +49,7 @@
     "VALIDATION_FAILED": "Certaines informations sont invalides.",
     "UNAUTHENTICATED": "Votre session a expiré. Reconnectez-vous pour continuer.",
     "SESSION_EXPIRED": "Votre session a expiré. Reconnectez-vous pour continuer.",
+    "SESSION_REVOKED": "Votre session a été révoquée. Reconnectez-vous pour continuer.",
     "FORBIDDEN": "Cette action n'est pas autorisée.",
     "NOT_FOUND": "Cet élément n'existe plus.",
     "REQUEST_REJECTED": "La demande a été refusée.",

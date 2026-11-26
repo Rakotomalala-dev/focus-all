@@ -37,9 +37,16 @@ export const envSchema = z.object({
   JWT_ACCESS_SECRET: z
     .string()
     .min(32, "Le secret doit contenir au moins 32 caractères (doc 03 §4.2)"),
-  JWT_ACCESS_TTL: z.string().min(1).default("15m"),
+  // Format `<nombre><s|m|h|d>` : la durée est convertie en secondes par le
+  // service d'authentification, jamais interprétée à la volée.
+  JWT_ACCESS_TTL: z.string().regex(/^\d+[smhd]$/, "Durée attendue : 15m, 30d…").default("15m"),
+  JWT_REFRESH_TTL: z.string().regex(/^\d+[smhd]$/, "Durée attendue : 15m, 30d…").default("30d"),
   JWT_ISSUER: z.string().min(1).default("focus-api"),
   JWT_AUDIENCE: z.string().min(1).default("focus-clients"),
+  // Coûts Argon2id (doc 01 §15) : bornes basses pour qu'une valeur fautive
+  // n'affaiblisse pas silencieusement le hachage.
+  ARGON2_MEMORY_KIB: z.coerce.number().int().min(8 * 1024).default(19_456),
+  ARGON2_TIME_COST: z.coerce.number().int().min(1).max(10).default(2),
 });
 
 export type Env = z.output<typeof envSchema>;
