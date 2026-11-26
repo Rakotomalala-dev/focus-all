@@ -618,13 +618,15 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    M0["M0 — Fondations<br/>2 semaines<br/>monorepo, CI, auth, schéma, sync serveur"] --> M1["M1 — MVP<br/>6 semaines<br/>tâches, projets, vues, rappels, Android + Web"]
-    M1 --> M1b["Bêta fermée<br/>2 semaines<br/>50 utilisateurs, correctifs"]
-    M1b --> M2["M2 — V1.1<br/>5 semaines<br/>Pomodoro, Eisenhower, stats, offline écriture, Tauri"]
-    M2 --> M3["M3 — V1.2<br/>5 semaines<br/>habitudes, temps, exports, résumés"]
-    M3 --> M4["M4 — V1.3<br/>6 semaines<br/>collaboration, temps réel, centre de notifications"]
+    M0["M0 — Fondations<br/>monorepo, CI, auth, schéma, sync serveur"] --> M1["M1 — MVP<br/>tâches, projets, vues, rappels, Android + Web"]
+    M1 --> M1b["Bêta fermée<br/>50 utilisateurs, correctifs"]
+    M1b --> M2["M2 — V1.1<br/>Pomodoro, Eisenhower, stats, offline écriture, Tauri"]
+    M2 --> M3["M3 — V1.2<br/>habitudes, temps, exports, résumés"]
+    M3 --> M4["M4 — V1.3<br/>collaboration, temps réel, centre de notifications"]
     M4 --> V2["V2 — à cadrer<br/>modèles, automatisations, IA, intégrations"]
 ```
+
+L'ordre des phases fait foi ; **aucune durée ni date cible n'est engagée** dans ce document.
 
 | Phase | Objectif | Critères de sortie |
 |---|---|---|
