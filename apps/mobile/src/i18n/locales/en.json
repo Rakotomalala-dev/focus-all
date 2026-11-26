@@ -2,6 +2,34 @@
   "app": {
     "name": "Focus"
   },
+  "auth": {
+    "restoring": "Restoring your session…",
+    "greeting": "Hello {{name}}",
+    "logout": "Sign out",
+    "passwordHint": "10 characters minimum.",
+    "fields": {
+      "email": "Email",
+      "password": "Password",
+      "displayName": "Display name"
+    },
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Get your tasks back on every device.",
+      "submit": "Sign in",
+      "switch": "Create an account"
+    },
+    "register": {
+      "title": "Create an account",
+      "subtitle": "A personal workspace is created with your account.",
+      "submit": "Create my account",
+      "switch": "I already have an account"
+    },
+    "errors": {
+      "invalidCredentials": "Incorrect email or password.",
+      "emailTaken": "An account already exists with this email.",
+      "validation": "Check the email and the password (10 characters minimum)."
+    }
+  },
   "tasks": {
     "title": "My tasks",
     "count_one": "{{count}} task",
@@ -26,7 +54,8 @@
       "markDone": "Mark “{{title}}” as done",
       "reopen": "Reopen “{{title}}”",
       "meta": "{{status}}",
-      "metaWithPriority": "{{status}} · {{priority}}"
+      "metaWithPriority": "{{status}} · {{priority}}",
+      "open": "Edit “{{title}}”"
     },
     "status": {
       "TODO": "To do",
@@ -41,7 +70,27 @@
       "HIGH": "High priority",
       "URGENT": "Urgent priority"
     },
-    "dueDate": "Due: {{date}}"
+    "dueDate": "Due: {{date}}",
+    "detail": {
+      "title": "Edit task",
+      "cancel": "Cancel",
+      "save": "Save",
+      "dueDatePlaceholder": "YYYY-MM-DD",
+      "fields": {
+        "title": "Title",
+        "description": "Description",
+        "priority": "Priority",
+        "dueDate": "Due date"
+      },
+      "errors": {
+        "title": "A title is required.",
+        "dueDate": "Use the YYYY-MM-DD format."
+      },
+      "notFound": {
+        "title": "Task not found",
+        "body": "It may have been deleted on another device."
+      }
+    }
   },
   "errors": {
     "network": "Connection failed. Check your network and try again.",

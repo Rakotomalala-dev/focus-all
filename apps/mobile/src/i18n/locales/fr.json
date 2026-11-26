@@ -2,6 +2,34 @@
   "app": {
     "name": "Focus"
   },
+  "auth": {
+    "restoring": "Restauration de la session…",
+    "greeting": "Bonjour {{name}}",
+    "logout": "Se déconnecter",
+    "passwordHint": "10 caractères minimum.",
+    "fields": {
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "displayName": "Nom affiché"
+    },
+    "login": {
+      "title": "Connexion",
+      "subtitle": "Retrouvez vos tâches sur tous vos appareils.",
+      "submit": "Se connecter",
+      "switch": "Créer un compte"
+    },
+    "register": {
+      "title": "Créer un compte",
+      "subtitle": "Un espace personnel est créé avec votre compte.",
+      "submit": "Créer mon compte",
+      "switch": "J'ai déjà un compte"
+    },
+    "errors": {
+      "invalidCredentials": "E-mail ou mot de passe incorrect.",
+      "emailTaken": "Un compte existe déjà avec cet e-mail.",
+      "validation": "Vérifiez l'e-mail et le mot de passe (10 caractères minimum)."
+    }
+  },
   "tasks": {
     "title": "Mes tâches",
     "count_one": "{{count}} tâche",
@@ -26,7 +54,8 @@
       "markDone": "Marquer « {{title}} » comme terminée",
       "reopen": "Rouvrir « {{title}} »",
       "meta": "{{status}}",
-      "metaWithPriority": "{{status}} · {{priority}}"
+      "metaWithPriority": "{{status}} · {{priority}}",
+      "open": "Modifier « {{title}} »"
     },
     "status": {
       "TODO": "À faire",
@@ -41,7 +70,27 @@
       "HIGH": "Priorité haute",
       "URGENT": "Priorité urgente"
     },
-    "dueDate": "Échéance : {{date}}"
+    "dueDate": "Échéance : {{date}}",
+    "detail": {
+      "title": "Modifier la tâche",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "dueDatePlaceholder": "AAAA-MM-JJ",
+      "fields": {
+        "title": "Titre",
+        "description": "Description",
+        "priority": "Priorité",
+        "dueDate": "Échéance"
+      },
+      "errors": {
+        "title": "Le titre est obligatoire.",
+        "dueDate": "Utilisez le format AAAA-MM-JJ."
+      },
+      "notFound": {
+        "title": "Tâche introuvable",
+        "body": "Elle a peut-être été supprimée sur un autre appareil."
+      }
+    }
   },
   "errors": {
     "network": "Connexion impossible. Vérifiez votre réseau puis réessayez.",
