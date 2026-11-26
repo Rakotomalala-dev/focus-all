@@ -55,10 +55,19 @@ export type MutationResult =
   | { readonly status: "not_found" }
   | { readonly status: "conflict"; readonly currentVersion: number };
 
+// Métadonnées d'une écriture : elles ne changent pas la règle métier, mais le
+// journal de sync a besoin de l'acteur et du `clientMutationId` idempotent, et
+// une création hors ligne impose son identifiant UUID v7.
+export type MutationOptions = {
+  readonly id?: string;
+  readonly actorId?: string;
+  readonly clientMutationId?: string;
+};
+
 // Port du repository (N-1/N-2) : le service ne connaît ni Prisma ni le stockage.
 // Le remplacement par un repository Prisma se fera sans toucher au service.
 export interface TaskRepository {
-  create(draft: TaskDraft, workspaceId: string): Promise<Task>;
+  create(draft: TaskDraft, workspaceId: string, options?: MutationOptions): Promise<Task>;
   findById(id: string, workspaceId: string): Promise<Task | undefined>;
   list(filters: TaskFilters, workspaceId: string, page: TaskPage): Promise<TaskPageResult>;
   update(
@@ -66,8 +75,17 @@ export interface TaskRepository {
     workspaceId: string,
     patch: TaskPatch,
     expectedVersion: number,
+    options?: MutationOptions,
   ): Promise<MutationResult>;
-  remove(id: string, workspaceId: string, expectedVersion: number): Promise<MutationResult>;
+  remove(
+    id: string,
+    workspaceId: string,
+    expectedVersion: number,
+    options?: MutationOptions,
+  ): Promise<MutationResult>;
+  // Instantané complet du workspace (bootstrap / resynchronisation du client),
+  // non paginé : c'est un état de référence, pas une navigation.
+  snapshot(workspaceId: string): Promise<readonly Task[]>;
 }
 
 export const TASK_REPOSITORY = "TASK_REPOSITORY";
@@ -110,12 +128,12 @@ export class InMemoryTaskRepository implements TaskRepository {
     return repository;
   }
 
-  async create(draft: TaskDraft, workspaceId: string): Promise<Task> {
+  async create(draft: TaskDraft, workspaceId: string, options?: MutationOptions): Promise<Task> {
     const now = new Date().toISOString();
     this.sequence += 1;
 
     const task: StoredTask = {
-      id: uuidV7(),
+      id: options?.id ?? uuidV7(),
       workspaceId,
       title: draft.title,
       priority: draft.priority,
@@ -148,6 +166,7 @@ export class InMemoryTaskRepository implements TaskRepository {
     workspaceId: string,
     patch: TaskPatch,
     expectedVersion: number,
+    _options?: MutationOptions,
   ): Promise<MutationResult> {
     const existing = this.tasks.get(id);
     if (existing === undefined || existing.workspaceId !== workspaceId) {
@@ -196,7 +215,12 @@ export class InMemoryTaskRepository implements TaskRepository {
     return { status: "ok", task: toTask(next) };
   }
 
-  async remove(id: string, workspaceId: string, expectedVersion: number): Promise<MutationResult> {
+  async remove(
+    id: string,
+    workspaceId: string,
+    expectedVersion: number,
+    _options?: MutationOptions,
+  ): Promise<MutationResult> {
     const existing = this.tasks.get(id);
     if (existing === undefined || existing.workspaceId !== workspaceId) {
       return { status: "not_found" };
@@ -207,6 +231,13 @@ export class InMemoryTaskRepository implements TaskRepository {
 
     this.tasks.delete(id);
     return { status: "ok", task: toTask(existing) };
+  }
+
+  async snapshot(workspaceId: string): Promise<readonly Task[]> {
+    return [...this.tasks.values()]
+      .filter((task) => task.workspaceId === workspaceId)
+      .sort(compareTasks)
+      .map(toTask);
   }
 
   async list(filters: TaskFilters, workspaceId: string, page: TaskPage): Promise<TaskPageResult> {

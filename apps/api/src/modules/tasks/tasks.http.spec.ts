@@ -7,8 +7,6 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   startTestApi,
-  TEST_USER_ID,
-  TEST_WORKSPACE_ID,
   type HttpResult,
   type RequestOptions,
   type TestApi,
@@ -40,14 +38,15 @@ function parseList(body: unknown): TaskListResponse {
 
 beforeAll(async () => {
   api = await startTestApi();
-  authorization = await api.bearerToken({
-    userId: TEST_USER_ID,
-    workspaceId: TEST_WORKSPACE_ID,
-  });
+  // Workspace neuf propre à ce fichier : l'état vide est garanti même si la
+  // base contient déjà les données d'autres fichiers exécutés en parallèle.
+  authorization = await api.bearerToken(await api.createWorkspace("tasks-http"));
 });
 
 afterAll(async () => {
-  await api.close();
+  // Si le démarrage a échoué, `api` est indéfini : le nettoyage ne doit pas
+  // masquer l'erreur d'origine.
+  await api?.close();
 });
 
 describe("état vide", () => {

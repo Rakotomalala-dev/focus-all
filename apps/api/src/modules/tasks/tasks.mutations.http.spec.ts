@@ -7,8 +7,6 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   startTestApi,
-  TEST_USER_ID,
-  TEST_WORKSPACE_ID,
   type HttpResult,
   type RequestOptions,
   type TestApi,
@@ -50,14 +48,13 @@ function remove(id: string, version?: number, ifMatch?: string): Promise<HttpRes
 
 beforeAll(async () => {
   api = await startTestApi();
-  authorization = await api.bearerToken({
-    userId: TEST_USER_ID,
-    workspaceId: TEST_WORKSPACE_ID,
-  });
+  authorization = await api.bearerToken(await api.createWorkspace("tasks-mutations"));
 });
 
 afterAll(async () => {
-  await api.close();
+  // Si le démarrage a échoué, `api` est indéfini : le nettoyage ne doit pas
+  // masquer l'erreur d'origine.
+  await api?.close();
 });
 
 describe("PATCH /api/v1/tasks/:id", () => {

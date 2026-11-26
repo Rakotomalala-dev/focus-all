@@ -10,6 +10,8 @@ import {
 } from "@focus/contracts";
 import { DomainError } from "../../common/domain-error";
 import type { AuthContext } from "../auth/auth-context";
+import { describeIssues } from "../../common/zod-issues";
+import { toTaskPatch } from "./task-patch";
 import {
   TASK_REPOSITORY,
   type MutationResult,
@@ -18,18 +20,6 @@ import {
   type TaskPatch,
   type TaskRepository,
 } from "./task.repository";
-
-type Issue = { readonly path: readonly (string | number)[]; readonly message: string };
-
-// Les erreurs de Zod deviennent un `detail` lisible (diagnostic d'entrée) ; le
-// filtre global les transforme en 400 `VALIDATION_FAILED`. Les refus métier, eux,
-// passent par `DomainError` : clé i18n, jamais de phrase (AGENTS §2).
-export function describeIssues(issues: readonly Issue[]): string[] {
-  return issues.map((issue) => {
-    const path = issue.path.join(".");
-    return `${path.length > 0 ? path : "body"}: ${issue.message}`;
-  });
-}
 
 // Le curseur transporte la clé de tri de la dernière tâche vue, pas un rang :
 // si la liste change entre deux pages (insertion, réordonnancement), aucune
@@ -114,7 +104,7 @@ export class TasksService {
     if (!parsed.success) {
       throw new BadRequestException(describeIssues(parsed.error.issues));
     }
-    return this.tasks.create(parsed.data, auth.workspaceId);
+    return this.tasks.create(parsed.data, auth.workspaceId, { actorId: auth.userId });
   }
 
   async findById(auth: AuthContext, rawId: string): Promise<Task> {
@@ -165,23 +155,16 @@ export class TasksService {
 
     const { version, ...fields } = parsed.data;
     const expected = resolveExpectedVersion(version, ifMatch);
-    // `exactOptionalPropertyTypes` : chaque clé absente est omise du patch.
-    const patch: TaskPatch = {
-      ...(fields.title === undefined ? {} : { title: fields.title }),
-      ...(fields.description === undefined ? {} : { description: fields.description }),
-      ...(fields.projectId === undefined ? {} : { projectId: fields.projectId }),
-      ...(fields.dueDate === undefined ? {} : { dueDate: fields.dueDate }),
-      ...(fields.priority === undefined ? {} : { priority: fields.priority }),
-      ...(fields.tagIds === undefined ? {} : { tagIds: fields.tagIds }),
-      ...(fields.status === undefined ? {} : { status: fields.status }),
-    };
+    const patch: TaskPatch = toTaskPatch(fields);
 
     if (Object.keys(patch).length === 0) {
       throw new DomainError("request.empty_patch");
     }
 
     return this.applyMutation(
-      await this.tasks.update(id, auth.workspaceId, patch, expected.version),
+      await this.tasks.update(id, auth.workspaceId, patch, expected.version, {
+        actorId: auth.userId,
+      }),
       expected.source,
     );
   }
@@ -200,7 +183,7 @@ export class TasksService {
 
     const expected = resolveExpectedVersion(parsed.data.version, ifMatch);
     this.applyMutation(
-      await this.tasks.remove(id, auth.workspaceId, expected.version),
+      await this.tasks.remove(id, auth.workspaceId, expected.version, { actorId: auth.userId }),
       expected.source,
     );
   }

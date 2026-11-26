@@ -11,14 +11,15 @@ import {
 // Fastify, vrais jetons signés. Aucun test ne contourne le guard, sinon il ne
 // prouverait rien sur l'exigence N-3/S-2.
 const OTHER_SECRET = "other-secret-000000000000000000000000000";
-const WORKSPACE_A = "018f3b3c-1a2b-7c3d-8e4f-0a1b2c3d4e5f";
-const WORKSPACE_B = "018f3b3c-1a2b-7c3d-8e4f-111111111111";
-const USER_A = "018f3b3c-1a2b-7c3d-8e4f-444444444444";
-const USER_B = "018f3b3c-1a2b-7c3d-8e4f-555555555555";
 
 let api: TestApi;
 let tokenA = "";
 let tokenB = "";
+// Deux comptes réels créés par le harnais : le cloisonnement porte sur des
+// workspaces distincts en base, pas sur des identifiants fictifs.
+let userA = "";
+let workspaceA = "";
+let workspaceB = "";
 
 function unauthorizedBody(result: HttpResult): {
   status: number;
@@ -36,13 +37,18 @@ function unauthorizedBody(result: HttpResult): {
 
 // Jeton de A par défaut ; `overrides` couvre les cas forgé / expiré / B.
 async function token(overrides: Partial<TokenClaims> = {}): Promise<string> {
-  return api.bearerToken({ userId: USER_A, workspaceId: WORKSPACE_A, ...overrides });
+  return api.bearerToken({ userId: userA, workspaceId: workspaceA, ...overrides });
 }
 
 beforeAll(async () => {
   api = await startTestApi();
+  const a = await api.createWorkspace("auth-a");
+  const b = await api.createWorkspace("auth-b");
+  userA = a.userId;
+  workspaceA = a.workspaceId;
+  workspaceB = b.workspaceId;
   tokenA = await token();
-  tokenB = await token({ userId: USER_B, workspaceId: WORKSPACE_B });
+  tokenB = await token({ userId: b.userId, workspaceId: b.workspaceId });
 });
 
 afterAll(async () => {
@@ -93,7 +99,7 @@ describe("accès refusé sans jeton valide", () => {
 
   it("refuse un jeton sans claim workspaceId en 401", async () => {
     // `sub` présent, `workspaceId` absent : jeton bien signé mais inexploitable.
-    const incomplete = await api.bearerToken({ userId: USER_A });
+    const incomplete = await api.bearerToken({ userId: userA });
 
     const result = await api.request("/api/v1/tasks", { authorization: incomplete });
 
@@ -137,7 +143,7 @@ describe("cloisonnement avec deux jetons", () => {
           method: "POST",
           authorization: tokenA,
           // Injection volontaire : ce champ ne doit jamais décider du scope.
-          body: { title: "tentative de fuite", workspaceId: WORKSPACE_B },
+          body: { title: "tentative de fuite", workspaceId: workspaceB },
         })
       ).body,
     );

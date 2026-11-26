@@ -1,0 +1,200 @@
+// Schéma de données — phase M0 (doc 01 §9, doc 03 §5.1).
+// Sous-ensemble livré en M0 : identité/sessions, workspace, projet, tâche et
+// journal de synchronisation. Les tables des phases ultérieures (tags,
+// rappels, habitudes…) seront ajoutées avec le module qui les consomme (O9).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum RecurrenceMode {
+  FIXED
+  AFTER_COMPLETION
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+// Opération du journal : un `UPDATE` et un `CREATE` produisent tous deux un
+// UPSERT côté journal (le client applique l'état complet), une suppression un
+// tombstone DELETE (doc 01 §9.3).
+enum SyncOperation {
+  UPSERT
+  DELETE
+}
+
+model User {
+  id              String    @id @db.Uuid
+  // `citext` rend l'unicité insensible à la casse sans dépendre du client
+  // (RF-01) ; l'extension est créée par la migration initiale.
+  email           String    @unique @db.Citext
+  passwordHash    String    @db.VarChar(255)
+  displayName     String    @db.VarChar(80)
+  avatarUrl       String?   @db.VarChar(2048)
+  timezone        String    @default("Europe/Paris") @db.VarChar(64)
+  locale          String    @default("fr") @db.VarChar(5)
+  emailVerifiedAt DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt       DateTime? @db.Timestamptz(3)
+
+  sessions  Session[]
+  memberships WorkspaceMember[]
+  workspaces  Workspace[] @relation("WorkspaceOwner")
+
+  @@index([deletedAt])
+}
+
+model Session {
+  id               String    @id @db.Uuid
+  userId           String    @db.Uuid
+  // Empreinte SHA-256 du refresh token : la valeur en clair n'est jamais
+  // stockée (doc 03 §6.2).
+  refreshTokenHash String    @unique @db.VarChar(64)
+  // Une famille couvre une chaîne de rotations : présenter un token déjà
+  // consommé révoque toute la famille (détection de réutilisation).
+  familyId         String    @db.Uuid
+  deviceId         String?   @db.Uuid
+  userAgent        String?   @db.VarChar(512)
+  ip               String?   @db.VarChar(64)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  lastUsedAt       DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt        DateTime  @db.Timestamptz(3)
+  revokedAt        DateTime? @db.Timestamptz(3)
+  replacedById     String?   @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+}
+
+model Workspace {
+  id         String   @id @db.Uuid
+  name       String   @db.VarChar(120)
+  ownerId    String   @db.Uuid
+  isPersonal Boolean  @default(false)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  owner       User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     WorkspaceMember[]
+  projects    Project[]
+  tasks       Task[]
+  syncChanges SyncChange[]
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  workspaceId String        @db.Uuid
+  userId      String        @db.Uuid
+  role        WorkspaceRole @default(MEMBER)
+  joinedAt    DateTime      @default(now()) @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+  @@index([userId])
+}
+
+model Project {
+  id          String    @id @db.Uuid
+  workspaceId String    @db.Uuid
+  name        String    @db.VarChar(120)
+  color       String?   @db.VarChar(32)
+  description String?   @db.Text
+  sortOrder   Decimal   @default(1) @db.Decimal(30, 15)
+  archivedAt  DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@index([workspaceId, archivedAt])
+}
+
+model Task {
+  id              String         @id @db.Uuid
+  workspaceId     String         @db.Uuid
+  projectId       String?        @db.Uuid
+  parentId        String?        @db.Uuid
+  title           String         @db.VarChar(200)
+  description     String?        @db.Text
+  status          TaskStatus     @default(TODO)
+  priority        TaskPriority   @default(NONE)
+  dueDate         DateTime?      @db.Date
+  dueTime         String?        @db.VarChar(5)
+  timezone        String         @default("Europe/Paris") @db.VarChar(64)
+  completedAt     DateTime?      @db.Timestamptz(3)
+  // Clé de tri fractionnaire (doc 01 §9.3) : insertion entre deux éléments sans
+  // réécrire les voisins. Exposée en chaîne décimale à 15 décimales.
+  sortOrder       Decimal        @default(1) @db.Decimal(30, 15)
+  recurrenceRule  String?        @db.VarChar(400)
+  recurrenceMode  RecurrenceMode @default(FIXED)
+  estimateMinutes Int?
+  // Le contrat expose `tagIds` ; la table `Tag`/`TaskTag` arrive avec la
+  // feature tags (M1). Stocker le tableau ici évite une table morte en M0.
+  tagIds          String[]       @db.Uuid
+  version         Int            @default(0)
+  createdBy       String?        @db.Uuid
+  updatedBy       String?        @db.Uuid
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
+  deletedAt       DateTime?      @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parent    Task?     @relation("Subtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks  Task[]    @relation("Subtasks")
+
+  @@index([workspaceId, deletedAt])
+  @@index([workspaceId, projectId, status, sortOrder])
+  @@index([workspaceId, dueDate])
+}
+
+model SyncChange {
+  id               BigInt        @id @default(autoincrement())
+  workspaceId      String        @db.Uuid
+  entityType       String        @db.VarChar(32)
+  entityId         String        @db.Uuid
+  operation        SyncOperation
+  version          Int
+  payload          Json
+  actorId          String?       @db.Uuid
+  // Idempotence du push : un même `clientMutationId` rejoué ne produit pas
+  // une seconde écriture (doc 03 §6.5).
+  clientMutationId String?       @db.Uuid
+  changedAt        DateTime      @default(now()) @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, clientMutationId])
+  @@index([workspaceId, id])
+}

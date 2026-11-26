@@ -11,6 +11,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "postinstall": "prisma generate",
     "api:token": "node scripts/dev-token.cjs",
     "api:openapi": "pnpm --filter @focus/contracts build && node scripts/generate-openapi.cjs",
     "api:openapi:check": "pnpm --filter @focus/contracts build && node scripts/generate-openapi.cjs --check"
@@ -21,14 +26,20 @@
     "@nestjs/core": "^10.4.15",
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/platform-fastify": "^10.4.15",
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/client": "^6.1.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^3.24.1"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.cjs"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.2.3",
     "@types/node": "^22.10.5",
+    "prisma": "^6.1.0",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8",
     "zod-to-json-schema": "^3.24.1"
