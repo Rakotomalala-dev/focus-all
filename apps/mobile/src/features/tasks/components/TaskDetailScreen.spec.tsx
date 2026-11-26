@@ -15,6 +15,10 @@ vi.mock("expo-router", () => ({
   useRouter: () => ({ back: mocks.back }),
 }));
 
+vi.mock("../../projects/api/use-projects", () => ({
+  useProjects: () => ({ status: "success", data: [] }),
+}));
+
 vi.mock("../api/use-tasks", () => ({
   useTasks: () => mocks.useTasks(),
   useUpdateTask: () => ({
@@ -88,6 +92,7 @@ describe("TaskDetailScreen", () => {
           title: "Appeler le comptable demain",
           description: "Préparer les justificatifs",
           priority: "URGENT",
+          projectId: null,
         },
       });
     });

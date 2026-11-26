@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, TextInput, View } from "react-native";
 import { appErrorMessageKey } from "../../../data/http/app-error";
 import type { TaskPatchInput } from "../../../data/tasks/task-repository";
+import { useProjects } from "../../projects/api/use-projects";
 import { useTasks, useUpdateTask } from "../api/use-tasks";
 
 type EditForm = {
@@ -20,6 +21,7 @@ type EditForm = {
   readonly description: string;
   readonly priority: TaskPriority;
   readonly dueDate: string;
+  readonly projectId: string | null;
 };
 
 type ValidationKey = "tasks.detail.errors.title" | "tasks.detail.errors.dueDate";
@@ -118,6 +120,7 @@ function TaskEditForm({
   const theme = useFocusTheme();
   const { t } = useTranslation();
   const updateTask = useUpdateTask();
+  const projectsQuery = useProjects();
   const [validationKey, setValidationKey] = useState<ValidationKey | null>(null);
 
   const { control, handleSubmit } = useForm<EditForm>({
@@ -126,6 +129,7 @@ function TaskEditForm({
       description: task.description ?? "",
       priority: task.priority,
       dueDate: task.dueDate ?? "",
+      projectId: task.projectId ?? null,
     },
   });
 
@@ -145,6 +149,7 @@ function TaskEditForm({
     const patch: TaskPatchInput = {
       title: values.title,
       priority: values.priority,
+      projectId: values.projectId,
       ...(description.length === 0 ? {} : { description }),
       ...(dueDate.length === 0 ? {} : { dueDate }),
     };
@@ -296,6 +301,60 @@ function TaskEditForm({
                   fontSize: theme.typography.md.size,
                 }}
               />
+            )}
+          />
+        </View>
+
+        <View style={{ gap: theme.spacing.xs }}>
+          <AppText tone="muted">{t("tasks.detail.fields.project")}</AppText>
+          <Controller
+            control={control}
+            name="projectId"
+            render={({ field: { onChange, value } }) => (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm }}>
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: value === null }}
+                  accessibilityLabel={t("tasks.detail.inbox")}
+                  onPress={() => onChange(null)}
+                  style={{
+                    minHeight: 44,
+                    paddingHorizontal: theme.spacing.md,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: theme.radii.md,
+                    borderWidth: value === null ? 2 : theme.border.width,
+                    borderColor: value === null ? theme.colors.accent : theme.colors.border,
+                  }}
+                >
+                  <AppText tone="muted">{t("tasks.detail.inbox")}</AppText>
+                </Pressable>
+                {projectsQuery.status === "success"
+                  ? projectsQuery.data.map((project) => {
+                      const isSelected = value === project.id;
+                      return (
+                        <Pressable
+                          key={project.id}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: isSelected }}
+                          accessibilityLabel={project.name}
+                          onPress={() => onChange(project.id)}
+                          style={{
+                            minHeight: 44,
+                            paddingHorizontal: theme.spacing.md,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: theme.radii.md,
+                            borderWidth: isSelected ? 2 : theme.border.width,
+                            borderColor: isSelected ? theme.colors.accent : theme.colors.border,
+                          }}
+                        >
+                          <AppText tone="muted">{project.name}</AppText>
+                        </Pressable>
+                      );
+                    })
+                  : null}
+              </View>
             )}
           />
         </View>

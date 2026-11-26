@@ -17,7 +17,7 @@ const TASK: Task = {
 };
 
 type RecordedCall = {
-  readonly method: "get" | "post" | "patch";
+  readonly method: "get" | "post" | "patch" | "delete";
   readonly path: string;
   readonly body?: unknown;
   readonly query?: HttpQuery;
@@ -40,6 +40,10 @@ function createRecordingClient(response: unknown) {
     },
     patch: async (path, body, schema) => {
       calls.push({ method: "patch", path, body });
+      return reply(schema);
+    },
+    delete: async (path, schema, query) => {
+      calls.push({ method: "delete", path, ...(query === undefined ? {} : { query }) });
       return reply(schema);
     },
   };

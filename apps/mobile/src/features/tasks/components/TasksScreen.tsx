@@ -132,6 +132,26 @@ export function TasksScreen() {
 
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={t("tasks.card.projects")}
+            onPress={() => {
+              router.push("/projects");
+            }}
+            style={{
+              minHeight: 44,
+              minWidth: 44,
+              paddingHorizontal: theme.spacing.md,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: theme.radii.md,
+              borderWidth: theme.border.width,
+              borderColor: theme.colors.border,
+            }}
+          >
+            <AppText tone="muted">{t("tasks.card.projects")}</AppText>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
             accessibilityLabel={t("auth.logout")}
             disabled={logout.isPending}
             onPress={() => {

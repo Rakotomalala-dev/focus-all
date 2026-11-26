@@ -30,6 +30,62 @@
       "validation": "Check the email and the password (10 characters minimum)."
     }
   },
+  "projects": {
+    "title": "Projects",
+    "loading": "Loading projects…",
+    "active": "Active",
+    "archived": "Archived",
+    "open": "Open project “{{name}}”",
+    "error": {
+      "title": "Projects could not be loaded",
+      "retry": "Try again"
+    },
+    "empty": {
+      "title": "No projects",
+      "body": "Create a project to group tasks by client, topic or context."
+    },
+    "create": {
+      "label": "New project",
+      "placeholder": "Project name…",
+      "submit": "Create",
+      "invalid": "The name must contain between 1 and 80 characters."
+    },
+    "detail": {
+      "title": "Edit project",
+      "save": "Save",
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "delete": "Delete",
+      "confirmDelete": "Confirm deletion",
+      "fields": {
+        "name": "Name",
+        "description": "Description",
+        "color": "Color"
+      }
+    },
+    "errors": {
+      "name": "A project name is required."
+    },
+    "notFound": {
+      "title": "Project not found",
+      "body": "It may have been deleted on another device."
+    },
+    "colors": {
+      "none": "None",
+      "slate": "Slate",
+      "gray": "Gray",
+      "red": "Red",
+      "orange": "Orange",
+      "amber": "Amber",
+      "green": "Green",
+      "teal": "Teal",
+      "blue": "Blue",
+      "indigo": "Indigo",
+      "violet": "Violet",
+      "pink": "Pink",
+      "brown": "Brown"
+    }
+  },
   "tasks": {
     "title": "My tasks",
     "count_one": "{{count}} task",
@@ -55,7 +111,8 @@
       "reopen": "Reopen “{{title}}”",
       "meta": "{{status}}",
       "metaWithPriority": "{{status}} · {{priority}}",
-      "open": "Edit “{{title}}”"
+      "open": "Edit “{{title}}”",
+      "projects": "Projects"
     },
     "status": {
       "TODO": "To do",
@@ -80,8 +137,10 @@
         "title": "Title",
         "description": "Description",
         "priority": "Priority",
-        "dueDate": "Due date"
+        "dueDate": "Due date",
+        "project": "Project"
       },
+      "inbox": "Inbox",
       "errors": {
         "title": "A title is required.",
         "dueDate": "Use the YYYY-MM-DD format."

@@ -26,6 +26,8 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: t("app.name") }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="tasks/[id]" options={{ title: t("tasks.detail.title") }} />
+        <Stack.Screen name="projects/index" options={{ title: t("projects.title") }} />
+        <Stack.Screen name="projects/[id]" options={{ title: t("projects.detail.title") }} />
       </Stack>
     </QueryClientProvider>
   );

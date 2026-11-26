@@ -15,6 +15,7 @@ export type HttpClient = {
   readonly get: <T>(path: string, schema: ResponseSchema<T>, query?: HttpQuery) => Promise<T>;
   readonly post: <T>(path: string, body: unknown, schema: ResponseSchema<T>) => Promise<T>;
   readonly patch: <T>(path: string, body: unknown, schema: ResponseSchema<T>) => Promise<T>;
+  readonly delete: <T>(path: string, schema: ResponseSchema<T>, query?: HttpQuery) => Promise<T>;
 };
 
 // Le client ne connaît ni le store ni le service d'authentification : il reçoit
@@ -101,5 +102,7 @@ export function createHttpClient({
       send(instance.get(path, query === undefined ? {} : { params: query }), schema),
     post: (path, body, schema) => send(instance.post(path, body), schema),
     patch: (path, body, schema) => send(instance.patch(path, body), schema),
+    delete: (path, schema, query) =>
+      send(instance.delete(path, query === undefined ? {} : { params: query }), schema),
   };
 }

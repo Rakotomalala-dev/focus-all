@@ -30,6 +30,62 @@
       "validation": "Vérifiez l'e-mail et le mot de passe (10 caractères minimum)."
     }
   },
+  "projects": {
+    "title": "Projets",
+    "loading": "Chargement des projets…",
+    "active": "Actif",
+    "archived": "Archivé",
+    "open": "Ouvrir le projet « {{name}} »",
+    "error": {
+      "title": "Impossible de charger les projets",
+      "retry": "Réessayer"
+    },
+    "empty": {
+      "title": "Aucun projet",
+      "body": "Créez un projet pour regrouper vos tâches par client, thème ou contexte."
+    },
+    "create": {
+      "label": "Nouveau projet",
+      "placeholder": "Nom du projet…",
+      "submit": "Créer",
+      "invalid": "Le nom doit contenir entre 1 et 80 caractères."
+    },
+    "detail": {
+      "title": "Modifier le projet",
+      "save": "Enregistrer",
+      "archive": "Archiver",
+      "unarchive": "Désarchiver",
+      "delete": "Supprimer",
+      "confirmDelete": "Confirmer la suppression",
+      "fields": {
+        "name": "Nom",
+        "description": "Description",
+        "color": "Couleur"
+      }
+    },
+    "errors": {
+      "name": "Le nom du projet est obligatoire."
+    },
+    "notFound": {
+      "title": "Projet introuvable",
+      "body": "Il a peut-être été supprimé sur un autre appareil."
+    },
+    "colors": {
+      "none": "Aucune",
+      "slate": "Ardoise",
+      "gray": "Gris",
+      "red": "Rouge",
+      "orange": "Orange",
+      "amber": "Ambre",
+      "green": "Vert",
+      "teal": "Turquoise",
+      "blue": "Bleu",
+      "indigo": "Indigo",
+      "violet": "Violet",
+      "pink": "Rose",
+      "brown": "Brun"
+    }
+  },
   "tasks": {
     "title": "Mes tâches",
     "count_one": "{{count}} tâche",
@@ -55,7 +111,8 @@
       "reopen": "Rouvrir « {{title}} »",
       "meta": "{{status}}",
       "metaWithPriority": "{{status}} · {{priority}}",
-      "open": "Modifier « {{title}} »"
+      "open": "Modifier « {{title}} »",
+      "projects": "Projets"
     },
     "status": {
       "TODO": "À faire",
@@ -80,8 +137,10 @@
         "title": "Titre",
         "description": "Description",
         "priority": "Priorité",
-        "dueDate": "Échéance"
+        "dueDate": "Échéance",
+        "project": "Projet"
       },
+      "inbox": "Inbox",
       "errors": {
         "title": "Le titre est obligatoire.",
         "dueDate": "Utilisez le format AAAA-MM-JJ."
