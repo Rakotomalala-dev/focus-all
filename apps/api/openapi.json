@@ -103,6 +103,231 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Trop d'échecs : verrouillage progressif (1, 5 ou 15 minutes)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-reset/request": {
+      "post": {
+        "summary": "Demander un lien de réinitialisation (réponse toujours 202)",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Demande acceptée, sans révéler l'existence du compte"
+          },
+          "400": {
+            "description": "Corps invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-reset/confirm": {
+      "post": {
+        "summary": "Consommer un jeton de réinitialisation et révoquer les sessions",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Mot de passe changé, sessions révoquées"
+          },
+          "400": {
+            "description": "Jeton inconnu, expiré ou déjà consommé",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password/change": {
+      "post": {
+        "summary": "Changer le mot de passe et révoquer les autres sessions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Mot de passe changé"
+          },
+          "400": {
+            "description": "Mot de passe actuel incorrect ou nouveau mot de passe invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "summary": "Lister les sessions actives",
+        "responses": {
+          "200": {
+            "description": "Sessions actives de l'utilisateur, session courante marquée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Révoquer toutes les sessions, y compris la session courante",
+        "responses": {
+          "204": {
+            "description": "Toutes les sessions révoquées"
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/{id}": {
+      "delete": {
+        "summary": "Révoquer une session",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Session révoquée"
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session absente ou appartenant à un autre compte",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/connections": {
+      "get": {
+        "summary": "Consulter les dernières connexions (une entrée par famille)",
+        "responses": {
+          "200": {
+            "description": "Historique des connexions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -197,7 +422,7 @@
     },
     "/api/v1/me": {
       "get": {
-        "summary": "Profil et workspaces de l'utilisateur courant",
+        "summary": "Profil, préférences et workspaces de l'utilisateur courant",
         "responses": {
           "200": {
             "description": "Profil courant",
@@ -205,6 +430,116 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Mettre à jour le profil et les préférences",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profil mis à jour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Champ invalide ou corps vide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer logiquement le compte (purge après 30 jours)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccount"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Compte désactivé, sessions révoquées"
+          },
+          "400": {
+            "description": "Confirmation ou mot de passe invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/export": {
+      "get": {
+        "summary": "Exporter les données du compte avant suppression",
+        "responses": {
+          "200": {
+            "description": "Export JSON synchrone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountExport"
                 }
               }
             }
@@ -1174,6 +1509,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 80
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -1194,6 +1534,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200
+          },
+          "deviceName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
           }
         },
         "required": [
@@ -1231,13 +1576,49 @@
             "type": "string",
             "minLength": 1
           },
+          "avatarUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "timezone": {
             "type": "string",
             "minLength": 1
           },
           "locale": {
             "type": "string",
-            "minLength": 1
+            "enum": [
+              "fr",
+              "en"
+            ]
+          },
+          "weekStartsOn": {
+            "type": "string",
+            "enum": [
+              "MONDAY",
+              "SUNDAY"
+            ]
+          },
+          "timeFormat": {
+            "type": "string",
+            "enum": [
+              "H24",
+              "H12"
+            ]
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "LIGHT",
+              "DARK",
+              "SYSTEM"
+            ]
           },
           "workspaces": {
             "type": "array",
@@ -1279,9 +1660,516 @@
           "id",
           "email",
           "displayName",
+          "avatarUrl",
           "timezone",
           "locale",
+          "weekStartsOn",
+          "timeFormat",
+          "theme",
           "workspaces"
+        ],
+        "additionalProperties": false
+      },
+      "ProfileUpdate": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "avatarUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "fr",
+              "en"
+            ]
+          },
+          "weekStartsOn": {
+            "type": "string",
+            "enum": [
+              "MONDAY",
+              "SUNDAY"
+            ]
+          },
+          "timeFormat": {
+            "type": "string",
+            "enum": [
+              "H24",
+              "H12"
+            ]
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "LIGHT",
+              "DARK",
+              "SYSTEM"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PasswordChange": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "additionalProperties": false
+      },
+      "PasswordResetRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "PasswordResetConfirm": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 200
+          },
+          "password": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "DeleteAccount": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "confirmation": {
+            "type": "string",
+            "const": "DELETE"
+          }
+        },
+        "required": [
+          "password",
+          "confirmation"
+        ],
+        "additionalProperties": false
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "platform": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deviceName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "current",
+          "platform",
+          "deviceName",
+          "createdAt",
+          "lastUsedAt",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "SessionListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "current": {
+                  "type": "boolean"
+                },
+                "platform": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "deviceName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "lastUsedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "expiresAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "current",
+                "platform",
+                "deviceName",
+                "createdAt",
+                "lastUsedAt",
+                "expiresAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "Connection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "platform": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deviceName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "revokedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "current",
+          "platform",
+          "deviceName",
+          "createdAt",
+          "lastUsedAt",
+          "expiresAt",
+          "active",
+          "revokedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ConnectionListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "current": {
+                  "type": "boolean"
+                },
+                "platform": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "deviceName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "lastUsedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "expiresAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "revokedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "current",
+                "platform",
+                "deviceName",
+                "createdAt",
+                "lastUsedAt",
+                "expiresAt",
+                "active",
+                "revokedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "AccountExport": {
+        "type": "object",
+        "properties": {
+          "exportedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "displayName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "avatarUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "timezone": {
+                "type": "string",
+                "minLength": 1
+              },
+              "locale": {
+                "type": "string",
+                "enum": [
+                  "fr",
+                  "en"
+                ]
+              },
+              "weekStartsOn": {
+                "type": "string",
+                "enum": [
+                  "MONDAY",
+                  "SUNDAY"
+                ]
+              },
+              "timeFormat": {
+                "type": "string",
+                "enum": [
+                  "H24",
+                  "H12"
+                ]
+              },
+              "theme": {
+                "type": "string",
+                "enum": [
+                  "LIGHT",
+                  "DARK",
+                  "SYSTEM"
+                ]
+              },
+              "workspaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "isPersonal": {
+                      "type": "boolean"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "OWNER",
+                        "ADMIN",
+                        "MEMBER",
+                        "VIEWER"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "isPersonal",
+                    "role"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "displayName",
+              "avatarUrl",
+              "timezone",
+              "locale",
+              "weekStartsOn",
+              "timeFormat",
+              "theme",
+              "workspaces"
+            ],
+            "additionalProperties": false
+          },
+          "projects": {
+            "type": "array",
+            "items": {}
+          },
+          "tasks": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "required": [
+          "exportedAt",
+          "user",
+          "projects",
+          "tasks"
         ],
         "additionalProperties": false
       },

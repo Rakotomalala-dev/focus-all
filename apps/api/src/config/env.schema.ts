@@ -47,6 +47,16 @@ export const envSchema = z.object({
   // n'affaiblisse pas silencieusement le hachage.
   ARGON2_MEMORY_KIB: z.coerce.number().int().min(8 * 1024).default(19_456),
   ARGON2_TIME_COST: z.coerce.number().int().min(1).max(10).default(2),
+  // Livraison des e-mails de sécurité (RF-02/RF-06). Sans `SMTP_URL`, le
+  // service journalise un avertissement et n'envoie rien : jamais de jeton en
+  // clair dans les logs (S-5).
+  SMTP_URL: z.preprocess(emptyAsUndefined, z.string().url().optional()),
+  MAIL_FROM: z.string().min(1).default("Focus <no-reply@focus.local>"),
+  // Base des liens envoyés par e-mail (web/PWA).
+  APP_PUBLIC_URL: z.preprocess(
+    emptyAsUndefined,
+    z.string().url().default("http://localhost:8081"),
+  ),
 });
 
 export type Env = z.output<typeof envSchema>;

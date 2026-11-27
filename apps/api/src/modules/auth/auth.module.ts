@@ -4,6 +4,7 @@ import { AppConfigModule, APP_ENV } from "../../config/app-config.module";
 import type { Env } from "../../config/env.schema";
 import { AuthController, MeController } from "./auth.controller";
 import { AuthService } from "./auth.service";
+import { MAILER, SmtpMailer } from "./mailer";
 import { PasswordHasher } from "./password-hasher";
 
 // JwtModule est exporté pour que le guard global (déclaré dans AppModule) et
@@ -33,7 +34,12 @@ import { PasswordHasher } from "./password-hasher";
     }),
   ],
   controllers: [AuthController, MeController],
-  providers: [AuthService, PasswordHasher],
+  providers: [
+    AuthService,
+    PasswordHasher,
+    // Port de livraison remplaçable en test par une boîte mémoire.
+    { provide: MAILER, useClass: SmtpMailer },
+  ],
   exports: [JwtModule],
 })
 export class AuthModule {}

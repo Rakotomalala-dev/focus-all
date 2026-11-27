@@ -23,6 +23,10 @@ type DomainErrorParams = {
   readonly "auth.session_revoked": undefined;
   readonly "auth.email_taken": undefined;
   readonly "auth.no_workspace": undefined;
+  readonly "auth.too_many_attempts": { readonly retryAfterSeconds: number };
+  readonly "auth.invalid_reset_token": undefined;
+  readonly "auth.session_not_found": undefined;
+  readonly "auth.current_password_invalid": undefined;
 };
 
 export type DomainErrorKey = keyof DomainErrorParams;
@@ -53,6 +57,10 @@ const CATALOG: Readonly<
   "auth.session_revoked": { code: "SESSION_REVOKED", status: 401 },
   "auth.email_taken": { code: "REQUEST_REJECTED", status: 409 },
   "auth.no_workspace": { code: "FORBIDDEN", status: 403 },
+  "auth.too_many_attempts": { code: "RATE_LIMITED", status: 429 },
+  "auth.invalid_reset_token": { code: "REQUEST_REJECTED", status: 400 },
+  "auth.session_not_found": { code: "NOT_FOUND", status: 404 },
+  "auth.current_password_invalid": { code: "REQUEST_REJECTED", status: 400 },
 };
 
 // Erreur typée du domaine : le service lève, le filtre problem+json traduit en

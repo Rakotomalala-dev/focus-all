@@ -1,6 +1,6 @@
-import { NestFactory } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import { Test } from "@nestjs/testing";
 import { PrismaClient } from "@prisma/client";
 import { AppModule } from "../../src/app.module";
 import { APP_ENV } from "../../src/config/app-config.module";
@@ -8,6 +8,7 @@ import type { Env } from "../../src/config/env.schema";
 import { applyHttpConfig } from "../../src/config/http";
 import { loadRootEnv } from "../../src/config/load-env";
 import { uuidV7 } from "../../src/common/uuid-v7";
+import { MAILER, type Mailer } from "../../src/modules/auth/mailer";
 
 // Support des tests d'intégration HTTP : une seule application démarrée avec le
 // vrai bootstrap, un seul client de requêtes, des jetons signés par la
@@ -53,8 +54,34 @@ export type TestApi = {
   readonly createWorkspace: (label?: string) => Promise<TestWorkspace>;
   // Supprime un compte créé par une inscription (cascade sur ses workspaces).
   readonly deleteAccount: (email: string) => Promise<void>;
+  // Boîte mémoire : les tests de réinitialisation lisent le lien envoyé sans
+  // dépendre d'un serveur SMTP.
+  readonly mailbox: TestMailbox;
   readonly close: () => Promise<void>;
 };
+
+export type TestMailbox = Mailer & {
+  readonly passwordResets: { to: string; link: string; expiresMinutes: number }[];
+  readonly deletions: { to: string }[];
+  readonly lastPasswordReset: () => { to: string; link: string } | undefined;
+};
+
+function createTestMailbox(): TestMailbox {
+  const passwordResets: { to: string; link: string; expiresMinutes: number }[] = [];
+  const deletions: { to: string }[] = [];
+
+  return {
+    passwordResets,
+    deletions,
+    lastPasswordReset: () => passwordResets[passwordResets.length - 1],
+    sendPasswordReset: async (input) => {
+      passwordResets.push(input);
+    },
+    sendAccountDeleted: async (input) => {
+      deletions.push(input);
+    },
+  };
+}
 
 // Une base distante (Neon) refuse ou coupe les connexions au-delà de son quota.
 // Le harnais ouvre deux pools (application + fixtures) : limiter chacun à trois
@@ -85,7 +112,14 @@ export async function startTestApi(): Promise<TestApi> {
   // de sens ici et ferait échouer la validation d'environnement.
   delete process.env.PORT;
 
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
+  const mailbox = createTestMailbox();
+  // Même module que la production, avec le port e-mail remplacé : aucun envoi
+  // réel et le jeton du lien reste lisible par le test.
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(MAILER)
+    .useValue(mailbox)
+    .compile();
+  const app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter(), {
     logger: ["error"],
   });
   // Même configuration HTTP que `main.ts` : préfixe et CORS viennent de l'env.
@@ -188,5 +222,5 @@ export async function startTestApi(): Promise<TestApi> {
     await app.close();
   }
 
-  return { request, bearerToken, createWorkspace, deleteAccount, close };
+  return { request, bearerToken, createWorkspace, deleteAccount, mailbox, close };
 }

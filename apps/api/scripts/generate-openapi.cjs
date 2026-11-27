@@ -30,6 +30,16 @@ const COMPONENTS = {
   LoginInput: contracts.loginInputSchema,
   RefreshInput: contracts.refreshInputSchema,
   MeResponse: contracts.meResponseSchema,
+  ProfileUpdate: contracts.profileUpdateSchema,
+  PasswordChange: contracts.passwordChangeSchema,
+  PasswordResetRequest: contracts.passwordResetRequestSchema,
+  PasswordResetConfirm: contracts.passwordResetConfirmSchema,
+  DeleteAccount: contracts.deleteAccountSchema,
+  Session: contracts.sessionSchema,
+  SessionListResponse: contracts.sessionListResponseSchema,
+  Connection: contracts.connectionSchema,
+  ConnectionListResponse: contracts.connectionListResponseSchema,
+  AccountExport: contracts.accountExportSchema,
   SyncMutation: contracts.syncMutationSchema,
   SyncPushRequest: contracts.syncPushRequestSchema,
   SyncPushResponse: contracts.syncPushResponseSchema,
@@ -179,6 +189,91 @@ function buildDocument() {
             },
             400: problemResponse("Corps invalide"),
             401: problemResponse("Identifiants invalides"),
+            429: problemResponse("Trop d'échecs : verrouillage progressif (1, 5 ou 15 minutes)"),
+          },
+        },
+      },
+      "/api/v1/auth/password-reset/request": {
+        post: {
+          summary: "Demander un lien de réinitialisation (réponse toujours 202)",
+          security: [],
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("PasswordResetRequest") } },
+          },
+          responses: {
+            202: { description: "Demande acceptée, sans révéler l'existence du compte" },
+            400: problemResponse("Corps invalide"),
+          },
+        },
+      },
+      "/api/v1/auth/password-reset/confirm": {
+        post: {
+          summary: "Consommer un jeton de réinitialisation et révoquer les sessions",
+          security: [],
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("PasswordResetConfirm") } },
+          },
+          responses: {
+            204: { description: "Mot de passe changé, sessions révoquées" },
+            400: problemResponse("Jeton inconnu, expiré ou déjà consommé"),
+          },
+        },
+      },
+      "/api/v1/auth/password/change": {
+        post: {
+          summary: "Changer le mot de passe et révoquer les autres sessions",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("PasswordChange") } },
+          },
+          responses: {
+            204: { description: "Mot de passe changé" },
+            400: problemResponse("Mot de passe actuel incorrect ou nouveau mot de passe invalide"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/auth/sessions": {
+        get: {
+          summary: "Lister les sessions actives",
+          responses: {
+            200: {
+              description: "Sessions actives de l'utilisateur, session courante marquée",
+              content: { [JSON_CONTENT]: { schema: ref("SessionListResponse") } },
+            },
+            401: UNAUTHORIZED,
+          },
+        },
+        delete: {
+          summary: "Révoquer toutes les sessions, y compris la session courante",
+          responses: {
+            204: { description: "Toutes les sessions révoquées" },
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/auth/sessions/{id}": {
+        delete: {
+          summary: "Révoquer une session",
+          parameters: [ID_PARAMETER],
+          responses: {
+            204: { description: "Session révoquée" },
+            401: UNAUTHORIZED,
+            404: problemResponse("Session absente ou appartenant à un autre compte"),
+          },
+        },
+      },
+      "/api/v1/auth/connections": {
+        get: {
+          summary: "Consulter les dernières connexions (une entrée par famille)",
+          responses: {
+            200: {
+              description: "Historique des connexions",
+              content: { [JSON_CONTENT]: { schema: ref("ConnectionListResponse") } },
+            },
+            401: UNAUTHORIZED,
           },
         },
       },
@@ -216,11 +311,50 @@ function buildDocument() {
       },
       "/api/v1/me": {
         get: {
-          summary: "Profil et workspaces de l'utilisateur courant",
+          summary: "Profil, préférences et workspaces de l'utilisateur courant",
           responses: {
             200: {
               description: "Profil courant",
               content: { [JSON_CONTENT]: { schema: ref("MeResponse") } },
+            },
+            401: UNAUTHORIZED,
+          },
+        },
+        patch: {
+          summary: "Mettre à jour le profil et les préférences",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("ProfileUpdate") } },
+          },
+          responses: {
+            200: {
+              description: "Profil mis à jour",
+              content: { [JSON_CONTENT]: { schema: ref("MeResponse") } },
+            },
+            400: problemResponse("Champ invalide ou corps vide"),
+            401: UNAUTHORIZED,
+          },
+        },
+        delete: {
+          summary: "Supprimer logiquement le compte (purge après 30 jours)",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("DeleteAccount") } },
+          },
+          responses: {
+            204: { description: "Compte désactivé, sessions révoquées" },
+            400: problemResponse("Confirmation ou mot de passe invalide"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/me/export": {
+        get: {
+          summary: "Exporter les données du compte avant suppression",
+          responses: {
+            200: {
+              description: "Export JSON synchrone",
+              content: { [JSON_CONTENT]: { schema: ref("AccountExport") } },
             },
             401: UNAUTHORIZED,
           },

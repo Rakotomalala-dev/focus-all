@@ -19,6 +19,9 @@ describe("loadEnv", () => {
       JWT_AUDIENCE: "focus-clients",
       ARGON2_MEMORY_KIB: 19_456,
       ARGON2_TIME_COST: 2,
+      SMTP_URL: undefined,
+      MAIL_FROM: "Focus <no-reply@focus.local>",
+      APP_PUBLIC_URL: "http://localhost:8081",
     });
   });
 

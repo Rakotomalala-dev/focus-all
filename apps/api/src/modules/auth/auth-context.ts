@@ -5,6 +5,9 @@ import type { FastifyRequest } from "fastify";
 export type AuthContext = {
   readonly userId: string;
   readonly workspaceId: string;
+  // Session émettrice du jeton d'accès : permet de distinguer la session
+  // courante lors d'une révocation ou d'un changement de mot de passe.
+  readonly sessionId?: string;
 };
 
 // La requête porte le contexte une fois le guard passé ; le décorateur

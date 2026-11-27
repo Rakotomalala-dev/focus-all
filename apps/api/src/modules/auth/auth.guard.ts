@@ -41,7 +41,18 @@ function toAuthContext(payload: Record<string, unknown>): AuthContext | undefine
   if (!userId.success || !workspaceId.success) {
     return undefined;
   }
-  return { userId: userId.data, workspaceId: workspaceId.data };
+  // `sid` est optionnel pour les jetons émis avant son introduction ; un
+  // `sid` présent mais invalide invalide le jeton entier.
+  const sessionId =
+    payload.sid === undefined ? undefined : uuidSchema.safeParse(payload.sid);
+  if (sessionId !== undefined && !sessionId.success) {
+    return undefined;
+  }
+  return {
+    userId: userId.data,
+    workspaceId: workspaceId.data,
+    ...(sessionId === undefined || !sessionId.success ? {} : { sessionId: sessionId.data }),
+  };
 }
 
 // Guard global (APP_GUARD) : toute route est authentifiée sauf `@Public()`.
