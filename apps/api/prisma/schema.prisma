@@ -39,6 +39,22 @@ enum WorkspaceRole {
   VIEWER
 }
 
+enum WeekStart {
+  MONDAY
+  SUNDAY
+}
+
+enum TimeFormat {
+  H24
+  H12
+}
+
+enum ThemePreference {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
 // Opération du journal : un `UPDATE` et un `CREATE` produisent tous deux un
 // UPSERT côté journal (le client applique l'état complet), une suppression un
 // tombstone DELETE (doc 01 §9.3).
@@ -57,12 +73,19 @@ model User {
   avatarUrl       String?   @db.VarChar(2048)
   timezone        String    @default("Europe/Paris") @db.VarChar(64)
   locale          String    @default("fr") @db.VarChar(5)
+  weekStartsOn    WeekStart @default(MONDAY)
+  timeFormat      TimeFormat @default(H24)
+  theme           ThemePreference @default(SYSTEM)
   emailVerifiedAt DateTime? @db.Timestamptz(3)
+  // Suppression logique (RF-06) : la purge physique intervient 30 jours plus
+  // tard via `pnpm --filter @focus/api db:purge`.
+  deletionRequestedAt DateTime? @db.Timestamptz(3)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
   deletedAt       DateTime? @db.Timestamptz(3)
 
   sessions  Session[]
+  passwordResetTokens PasswordResetToken[]
   memberships WorkspaceMember[]
   workspaces  Workspace[] @relation("WorkspaceOwner")
 
@@ -79,6 +102,10 @@ model Session {
   // consommé révoque toute la famille (détection de réutilisation).
   familyId         String    @db.Uuid
   deviceId         String?   @db.Uuid
+  // Plateforme déclarée par le client (`X-Client-Platform`) et nom lisible de
+  // l'appareil : RF-03/RF-70 affichent ces informations dans les sessions.
+  platform         String?   @db.VarChar(20)
+  deviceName       String?   @db.VarChar(80)
   userAgent        String?   @db.VarChar(512)
   ip               String?   @db.VarChar(64)
   createdAt        DateTime  @default(now()) @db.Timestamptz(3)
@@ -91,6 +118,32 @@ model Session {
 
   @@index([userId, revokedAt])
   @@index([familyId])
+}
+
+// Verrouillage progressif après échecs de connexion (RF-01). La clé est
+// l'e-mail normalisé : un compte inexistant suit le même chemin, donc la
+// latence et le statut ne révèlent pas son existence.
+model LoginAttempt {
+  email        String    @id @db.Citext
+  failedCount  Int       @default(0)
+  lockLevel    Int       @default(0)
+  lockedUntil  DateTime? @db.Timestamptz(3)
+  lastFailedAt DateTime  @default(now()) @db.Timestamptz(3)
+}
+
+// Jeton de réinitialisation à usage unique (RF-02) : seule l'empreinte SHA-256
+// est stockée ; le lien en clair n'existe que dans l'e-mail.
+model PasswordResetToken {
+  id        String    @id @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique @db.VarChar(64)
+  expiresAt DateTime  @db.Timestamptz(3)
+  usedAt    DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Workspace {
