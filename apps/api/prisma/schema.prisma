@@ -76,6 +76,8 @@ model User {
   weekStartsOn    WeekStart @default(MONDAY)
   timeFormat      TimeFormat @default(H24)
   theme           ThemePreference @default(SYSTEM)
+  // RF-20 : l'analyse de la saisie rapide reste désactivable.
+  quickAddParsingEnabled Boolean @default(true)
   emailVerifiedAt DateTime? @db.Timestamptz(3)
   // Suppression logique (RF-06) : la purge physique intervient 30 jours plus
   // tard via `pnpm --filter @focus/api db:purge`.
@@ -158,6 +160,7 @@ model Workspace {
   members     WorkspaceMember[]
   projects    Project[]
   tasks       Task[]
+  tags        Tag[]
   syncChanges SyncChange[]
 
   @@index([ownerId])
@@ -219,6 +222,9 @@ model Task {
   // Le contrat expose `tagIds` ; la table `Tag`/`TaskTag` arrive avec la
   // feature tags (M1). Stocker le tableau ici évite une table morte en M0.
   tagIds          String[]       @db.Uuid
+  // RF-21 : date de début et rappels multiples d'une tâche.
+  startDate       DateTime?      @db.Date
+  reminders       String[]       @default([])
   version         Int            @default(0)
   createdBy       String?        @db.Uuid
   updatedBy       String?        @db.Uuid
@@ -254,4 +260,21 @@ model SyncChange {
 
   @@unique([workspaceId, clientMutationId])
   @@index([workspaceId, id])
+}
+
+// RF-26 : tag libre par workspace, unique sans tenir compte de la casse via
+// `nameNormalized` (PostgreSQL ne sait pas indexer `lower(name)` avec Prisma).
+model Tag {
+  id             String   @id @db.Uuid
+  workspaceId    String   @db.Uuid
+  name           String   @db.VarChar(40)
+  nameNormalized String   @db.VarChar(40)
+  color          String?  @db.VarChar(32)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, nameNormalized])
+  @@index([workspaceId])
 }
