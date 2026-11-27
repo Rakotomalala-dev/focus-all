@@ -5,4 +5,5 @@ export * from "./error-codes";
 export * from "./problem-details";
 export * from "./project";
 export * from "./sync";
+export * from "./tag";
 export * from "./task";

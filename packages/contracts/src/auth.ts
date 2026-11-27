@@ -114,6 +114,7 @@ export const meResponseSchema = z.object({
   weekStartsOn: weekStartSchema,
   timeFormat: timeFormatSchema,
   theme: themePreferenceSchema,
+  quickAddParsingEnabled: z.boolean(),
   workspaces: z.array(meWorkspaceSchema),
 });
 
@@ -130,6 +131,7 @@ export const profileUpdateSchema = z
     weekStartsOn: weekStartSchema.optional(),
     timeFormat: timeFormatSchema.optional(),
     theme: themePreferenceSchema.optional(),
+    quickAddParsingEnabled: z.boolean().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "Aucun champ à mettre à jour.",
