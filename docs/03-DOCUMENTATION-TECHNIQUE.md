@@ -5,7 +5,7 @@
 > **Public :** développeurs, DevOps, QA, agents IA contributeurs
 > **Documents liés :** [01-ARCHITECTURE.md](./01-ARCHITECTURE.md) · [02-CAHIER-DES-CHARGES.md](./02-CAHIER-DES-CHARGES.md) · [04-BEST-PRACTICES.md](./04-BEST-PRACTICES.md) · [05-SKILLS-AND-TOOLS.md](./05-SKILLS-AND-TOOLS.md)
 
-> **Avertissement d'état (2026-11-26).** Le socle **M0** est terminé : monorepo pnpm + Turborepo, configuration racine, `packages/config`, API NestJS/Fastify avec Prisma (migrations + seed), authentification complète (inscription, connexion, rotation de refresh, déconnexion, `/me`), CRUD tâches persistant, CRUD projets (RF-10 : unicité insensible à la casse, version optimiste, soft delete) et protocole de sync (`/sync/pull`, `/sync/push`, `/sync/snapshot`) couvert par des tests de convergence, et app Expo (SDK 52) avec session sécurisée, édition de tâche et écrans projets. Redis, les jobs BullMQ, les pièces jointes, les notifications et le reste des fonctionnalités M1 (vues, rappels, offline) restent à implémenter : les sections correspondantes décrivent la **cible**.
+> **Avertissement d'état (2026-11-27).** Le socle **M0** et les domaines **Compte et sécurité** puis **Tâches et projets** de M1 sont implémentés : monorepo pnpm + Turborepo, API NestJS/Fastify avec Prisma, authentification complète, CRUD projets (couleurs, archivage lecture seule, ordre fractionnaire, corbeille), CRUD tâches (sous-tâches, statuts, priorités, échéances et heures, tags, recherche plein texte, rappels, récurrence, corbeille), Inbox et filtres combinables, protocole de sync et app Expo correspondante. Redis, les jobs BullMQ, les pièces jointes, les notifications push et le mode hors ligne restent à implémenter : les sections correspondantes décrivent la **cible**.
 >
 > Vérifications **réellement exécutées** sur ce dépôt : `pnpm install` (lockfile `9.0`), `pnpm typecheck` (2 tâches, code 0), `pnpm lint` (0 avertissement, code 0), `pnpm test` (1 fichier, 2 tests passés, code 0), `pnpm --filter @focus/api build` (code 0), API démarrée puis `GET /health` et `GET /health/ready` → `200` (`database`/`redis` = `not_configured`), et `pnpm --filter @focus/mobile build:web` → `Exported: dist`, 3 routes statiques, code 0.
 >
@@ -207,7 +207,7 @@ pnpm db:generate           # régénère le client après un changement de sché
 pnpm db:seed               # jeu de données de développement
 ```
 
-Le schéma (`apps/api/prisma/schema.prisma`) contient `User`, `Session`, `Workspace`, `WorkspaceMember`, `Project`, `Task` et `SyncChange`. La migration initiale (`20261125052005_init`) crée l'extension `citext` pour l'unicité insensible à la casse des e-mails. La migration `20261126090000_add_project_version_soft_delete` ajoute `version` et `deletedAt` à `Project`, ainsi qu'un index unique d'expression `(workspaceId, lower(name))` limité aux projets non supprimés — cet index n'est pas représentable dans le DSL Prisma et vit donc dans le SQL de migration.
+Le schéma (`apps/api/prisma/schema.prisma`) contient `User`, `Session`, `Workspace`, `WorkspaceMember`, `Project`, `Task`, `Tag`, `SyncChange`, ainsi que les tables de sécurité (tentatives de connexion, jetons de réinitialisation, audit). La migration initiale (`20261125052005_init`) crée l'extension `citext` pour l'unicité insensible à la casse des e-mails. La migration `20261126090000_add_project_version_soft_delete` ajoute `version` et `deletedAt` à `Project`, ainsi qu'un index unique d'expression `(workspaceId, lower(name))` limité aux projets non supprimés. La migration additive `20261127120000_task_projects_m1` ajoute `Task.startDate`, `Task.reminders` (`String[]` ISO), le mode de récurrence `AFTER_COMPLETION`, `User.quickAddParsingEnabled`, la table `Tag` (`nameNormalized` unique par workspace), la colonne générée `Task.searchVector` et l'index GIN de recherche plein texte adossé à la fonction `focus_unaccent`.
 
 Le seed M0 est volontairement minimal et idempotent :
 
@@ -215,7 +215,7 @@ Le seed M0 est volontairement minimal et idempotent :
 |---|---|---|
 | `demo@focus.local` | `focus-dev-password` | 1 workspace personnel, 1 projet, 3 tâches |
 
-> Ces identifiants sont **strictement locaux**. Le seed complet (projets multiples, tags, rappels) arrive avec les features correspondantes en M1.
+> Ces identifiants sont **strictement locaux**. Le seed reste minimal ; tags, rappels et récurrences se créent via l'API et sont couverts par les tests d'intégration.
 
 ### 2.5 Démarrage
 
@@ -290,14 +290,18 @@ Règle de sécurité (N-7) : `detail` est **omis** sur les 5xx — le message in
  "messageKey":"task.version_precondition_failed","params":{"currentVersion":3}}
 ```
 
-### 2.8 Endpoints tâches (repository en mémoire)
+### 2.8 Endpoints tâches, projets et tags
 
 Première feature verticale : `controller → service → repository`, avec validation par `taskDraftSchema` et sortie d'erreur par le filtre problem+json.
 
 | Méthode | Route | Corps / paramètres | Réponse |
 |---|---|---|---|
 | `POST` | `/api/v1/tasks` | `taskDraftSchema` (seul `title` est obligatoire) | `201` + `taskSchema` |
-| `GET` | `/api/v1/tasks` | `taskListQuerySchema` : `limit` (1-100, défaut 50), `cursor`, `status`, `projectId` | `200` + `{ items, nextCursor }` |
+| `GET` | `/api/v1/tasks` | `taskListQuerySchema` : `limit` (1-100, défaut 50), `cursor`, `sort` (`MANUAL` par défaut), `status`, `priority`, `projectId`, `parentId`, `inbox`, `tagIds` (ET), `due`, `q`, `includeCompleted` | `200` + `{ items, nextCursor }` ; `DONE`/`CANCELLED` masquées sauf `status` explicite ou `includeCompleted=true` |
+| `PATCH` | `/api/v1/tasks/order` | `{ ids: [uuid] }` | `200` + tâches réordonnées (ordre fractionnaire persistant) |
+| `POST` | `/api/v1/tasks/inbox/empty` | `{ projectId }` | `200` + `{ moved }` ; déplace les tâches sans projet vers le projet cible |
+| `GET` | `/api/v1/tasks/trash` | — | `200` + `{ tasks, projects }` (supprimés depuis moins de 30 jours) |
+| `POST` | `/api/v1/tasks/:id/restore` | UUID | `200` + `taskSchema` ; restaure aussi les sous-tâches supprimées en cascade |
 | `GET` | `/api/v1/tasks/:id` | UUID dans le chemin | `200` + `taskSchema`, sinon `404 NOT_FOUND` / `400 VALIDATION_FAILED` |
 | `PATCH` | `/api/v1/tasks/:id` | `taskUpdateSchema` (tout optionnel) + `version` dans le corps **ou** `If-Match` | `200` + `taskSchema` (version incrémentée), `409 CONFLICT_VERSION` si la version ne correspond plus |
 | `DELETE` | `/api/v1/tasks/:id` | `?version=` **ou** `If-Match` | `204` sans corps, `409 CONFLICT_VERSION` si la version ne correspond plus |
@@ -317,9 +321,21 @@ curl -s -X POST http://localhost:4000/api/v1/tasks \
 | `GET` | `/api/v1/projects` | — | `200` + `{ items }` (projets vivants, archivés compris) |
 | `GET` | `/api/v1/projects/:id` | UUID | `200` + `projectSchema`, `404 NOT_FOUND` sinon |
 | `PATCH` | `/api/v1/projects/:id` | `projectUpdateSchema` + `version` ou `If-Match` | `200` + `projectSchema`, `409`/`412 CONFLICT_VERSION`, `409` si renommage vers un nom pris |
-| `DELETE` | `/api/v1/projects/:id` | `?version=` ou `If-Match` | `204`, soft delete (le nom redevient disponible) |
+| `PATCH` | `/api/v1/projects/order` | `{ ids: [uuid] }` | `200` + projets réordonnés |
+| `POST` | `/api/v1/projects/:id/restore` | UUID | `200` + `projectSchema` ; restaure le projet et ses tâches supprimées avec lui |
+| `DELETE` | `/api/v1/projects/:id` | `?version=` ou `If-Match` | `204`, soft delete du projet **et de ses tâches** (le nom redevient disponible) |
 
-Archiver/désarchiver passe par `PATCH { "archived": true|false }`. `color: null` et `description: null` effacent le champ ; un champ omis reste inchangé. `DELETE` est logique et **remet les tâches vivantes du projet dans l'Inbox** (`projectId = null`, `version + 1`, `SyncChange` de type `task`), dans la même transaction que le tombstone du projet. Un client hors ligne reçoit donc à la fois la suppression du projet et le déplacement des tâches.
+Archiver/désarchiver passe par `PATCH { "archived": true|false }` ; un projet archivé est en lecture seule (création, déplacement et réordonnancement de ses tâches refusés avec `409 task.project_archived`). `color: null` et `description: null` effacent le champ ; un champ omis reste inchangé. `DELETE` est logique : le projet et **toutes ses tâches vivantes** reçoivent un `deletedAt` dans la même transaction, et `POST /projects/:id/restore` les restaure ensemble. Les éléments restent 30 jours en corbeille avant purge.
+
+### Tags (RF-26/27)
+
+| Méthode | Route | Corps / paramètres | Réponse |
+|---|---|---|---|
+| `GET` | `/api/v1/tags` | — | `200` + `{ items, nextCursor: null }` |
+| `POST` | `/api/v1/tags` | `{ name, color? }` | `201` + `tagSchema`, `409 tag.name_taken` (insensible à la casse) |
+| `POST` | `/api/v1/tags/ensure` | `{ names: string[] }` (1-20) | `200` + tags créés ou existants, pour la saisie rapide `#tag` |
+| `PATCH` | `/api/v1/tags/:id` | `{ name?, color? }` | `200` + `tagSchema` |
+| `DELETE` | `/api/v1/tags/:id` | UUID | `204` ; retire aussi l'identifiant du tableau `Task.tagIds` |
 
 Propriétés importantes :
 
@@ -521,6 +537,8 @@ model Task {
   priority       TaskPriority @default(NONE)
   dueDate        DateTime? @db.Date
   dueTime        String?   @db.VarChar(5)
+  startDate      DateTime? @db.Date
+  reminders      String[]  @default([])
   timezone       String    @default("Europe/Paris") @db.VarChar(64)
   completedAt    DateTime? @db.Timestamptz(3)
   sortOrder      Decimal   @db.Decimal(30, 15)
@@ -536,8 +554,7 @@ model Task {
   project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   parent    Task?     @relation("Subtasks", fields: [parentId], references: [id], onDelete: Cascade)
   subtasks  Task[]    @relation("Subtasks")
-  tags      TaskTag[]
-  reminders Reminder[]
+  tagIds    String[]  @db.Uuid
 
   @@index([workspaceId, deletedAt])
   @@index([workspaceId, projectId, status, sortOrder])
@@ -653,7 +670,9 @@ curl -X POST http://localhost:4000/api/v1/tasks \
     "dueDate": "2026-11-23",
     "dueTime": "09:30",
     "timezone": "Europe/Paris",
-    "tags": [],
+    "tagIds": [],
+    "reminders": [],
+    "recurrenceMode": "FIXED",
     "estimateMinutes": 45
   }'
 ```
@@ -780,7 +799,9 @@ socket.on("task.updated", (event) => {
 
 ### 7.1 Client HTTP (Axios)
 
-Le client réel vit dans `apps/mobile/src/data/http/client.ts` : il valide chaque réponse avec le schéma `@focus/contracts` et normalise les erreurs en `AppError` (clé i18n). L'injection du jeton et la file de rafraîchissement arriveront avec l'authentification (`/auth/refresh`).
+Le client réel vit dans `apps/mobile/src/data/http/client.ts` : il valide chaque réponse avec le schéma `@focus/contracts`, normalise les erreurs en `AppError` (clé i18n), injecte le jeton d'accès et sérialise les rafraîchissements 401 concurrents derrière une seule requête `/auth/refresh`.
+
+**Écrans Tâches et projets (2026-11-27).** `TasksScreen` combine recherche, statut, priorité, échéance, tags, projet/Inbox, tri et inclusion des terminées dans des puces retirables ; la saisie rapide affiche un aperçu de ce qui sera créé (`demain 9h30 !haute #admin @ClientA *hebdo`). `TaskDetailScreen` édite tous les champs (statut, priorité, projet, dates, heure, estimation, tags, rappels, RRULE, mode de récurrence), prévisualise le Markdown limité et gère les sous-tâches. `TrashScreen` restaure tâches et projets ; `TagsScreen` crée, renomme et supprime les tags. Le réordonnancement se fait par appui long puis flèches haut/bas (le glisser-déposer natif reste une amélioration d'ergonomie, pas un changement de contrat) et appelle les endpoints bulk, donc l'ordre fractionnaire reste persistant et synchronisé.
 
 ```ts
 // apps/mobile/src/data/http/client.ts — cible

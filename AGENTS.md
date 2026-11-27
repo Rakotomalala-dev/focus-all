@@ -9,7 +9,7 @@
 
 ## 0. État réel du dépôt
 
-- Le dépôt contient le socle M0 et une partie de M1 : monorepo, `packages/{config,contracts,ui,design-tokens}`, API NestJS + Prisma (auth, compte et sécurité, projets, tâches, sync, health) et app Expo (session sécurisée, tâches, projets, réglages de compte). Les procédures `docs/03` décrivent l'état réel ; le reste de M1 et les phases suivantes restent des cibles.
+- Le dépôt contient le socle M0 et les domaines **Compte et sécurité** et **Tâches et projets** de M1 : monorepo, `packages/{config,contracts,ui,design-tokens}`, API NestJS + Prisma (auth, compte et sécurité, projets, tâches, tags, corbeille, sync, health) et app Expo (session sécurisée, tâches, projets, corbeille, réglages de compte). Les procédures `docs/03` décrivent l'état réel ; le reste de M1 (rappels push, pièces jointes, hors ligne, temps réel de collaboration) et les phases suivantes restent des cibles.
 - Un agent ne doit **jamais** présenter une fonctionnalité comme « existante » ou « testée » sans l'avoir vérifiée par une commande dont il a lu la sortie et le code de sortie.
 - Avant de coder : lire le document concerné (architecture → doc 01, procédure → doc 03, règle de code → doc 04).
 

@@ -713,10 +713,9 @@ erDiagram
 | `Workspace` | `id`, `name`, `ownerId`, `isPersonal`, `createdAt` | un workspace personnel créé à l'inscription |
 | `WorkspaceMember` | `workspaceId`, `userId`, `role` (`OWNER`/`ADMIN`/`MEMBER`/`VIEWER`), `joinedAt` | clé composite |
 | `Project` | `id`, `workspaceId`, `name`, `color`, `icon`, `description`, `sortOrder`, `archivedAt`, `version`, `deletedAt`, `visibility` (`PRIVATE`/`WORKSPACE`) | `sortOrder` fractionnaire, `version` optimiste et soft delete ; unicité `(workspaceId, lower(name))` partielle sur les projets vivants (index d'expression SQL) |
-| `Task` | `id`, `workspaceId`, `projectId` (nullable = Inbox), `parentId`, `title`, `description`, `status` (`TODO`/`IN_PROGRESS`/`DONE`/`CANCELLED`), `priority` (`NONE`/`LOW`/`MEDIUM`/`HIGH`/`URGENT`), `dueDate` (date), `dueTime`, `startDate`, `timezone`, `completedAt`, `sortOrder`, `recurrenceRule`, `recurrenceMode`, `estimateMinutes`, `version`, `createdBy`, `updatedBy`, `deletedAt` | auto-référence pour les sous-tâches (profondeur max 3) |
-| `Tag` | `id`, `workspaceId`, `name`, `color` | unicité `(workspaceId, lower(name))` |
-| `TaskTag` | `taskId`, `tagId` | clé composite |
-| `Reminder` | `id`, `taskId`, `triggerAt` (`timestamptz`), `offsetMinutes`, `channel` (`PUSH`/`LOCAL`/`EMAIL`), `sentAt`, `jobId` | idempotence par `jobId` |
+| `Task` | `id`, `workspaceId`, `projectId` (nullable = Inbox), `parentId`, `title`, `description`, `status`, `priority`, `dueDate` (date), `dueTime`, `startDate`, `timezone`, `completedAt`, `sortOrder`, `recurrenceRule`, `recurrenceMode`, `estimateMinutes`, `tagIds` (`uuid[]`), `reminders` (`text[]` ISO), `searchVector` (colonne générée), `version`, `createdBy`, `updatedBy`, `deletedAt` | auto-référence pour les sous-tâches (max 50) ; `searchVector` + index GIN pour la recherche sans accents |
+| `Tag` | `id`, `workspaceId`, `name`, `nameNormalized`, `color` | unicité `(workspaceId, nameNormalized)` ; la suppression retire l'id de `Task.tagIds` |
+| `TaskTag` / `Reminder` | — | non utilisés en M1 : les tags vivent dans `Task.tagIds` et les rappels dans `Task.reminders` ; leur normalisation est une cible V1.1 |
 | `Attachment` | `id`, `taskId`, `storageKey`, `fileName`, `mimeType`, `sizeBytes`, `checksum`, `uploadedBy`, `scanStatus` | `storageKey` jamais exposé tel quel |
 | `Comment` | `id`, `taskId`, `authorId`, `body`, `createdAt`, `editedAt` | V1.3 |
 | `Habit` | `id`, `userId`, `workspaceId`, `name`, `icon`, `frequency` (JSONB : jours ciblés), `targetPerPeriod`, `archivedAt` | V1.2 |
@@ -731,10 +730,10 @@ erDiagram
 
 | Convention | Règle |
 |---|---|
-| Suppression | **Soft delete** (`deletedAt`) sur `Task`, `Project`, `Tag`, `Habit` ; hard delete différé par job de purge (90 jours). Le soft delete produit un `SyncChange` de type `DELETE` (tombstone). |
+| Suppression | **Soft delete** (`deletedAt`) sur `Task` et `Project` ; purge définitive après **30 jours** (`pnpm --filter @focus/api db:purge`). Le soft delete produit un `SyncChange` de type `DELETE` (tombstone). |
 | Ordre | `sortOrder numeric` (pas `integer`) : insertion entre deux éléments = moyenne des voisins ; renormalisation périodique par job. |
 | Multi-tenant | Toute table métier porte `workspaceId` (dénormalisé même quand `projectId` suffirait) pour permettre les index et les requêtes de sync par workspace |
-| Index | `(workspaceId, deletedAt)`, `(workspaceId, projectId, status, sortOrder)`, `(workspaceId, dueDate)`, GIN sur `to_tsvector('simple', title || ' ' || coalesce(description,''))` |
+| Index | `(workspaceId, deletedAt)`, `(workspaceId, projectId, status, sortOrder)`, `(workspaceId, dueDate)`, GIN sur `searchVector` alimenté par `focus_unaccent(title || ' ' || coalesce(description,''))` |
 | Timestamps | `createdAt` / `updatedAt` en `timestamptz` ; `updatedAt` mis à jour par Prisma (`@updatedAt`) — jamais par le client |
 | Version | `version int` incrémenté à chaque écriture serveur (verrou optimiste) |
 | Récurrence | `recurrenceRule` stocke une chaîne **RRULE RFC 5545** (ex. `FREQ=WEEKLY;BYDAY=MO,WE;INTERVAL=1`), `recurrenceMode` ∈ `FIXED` (même horaire) / `AFTER_COMPLETION` |
@@ -757,9 +756,9 @@ erDiagram
 | Format | JSON UTF-8, `camelCase`, dates ISO 8601 UTC (`2026-11-22T09:30:00.000Z`), dates civiles `YYYY-MM-DD`, durées en secondes |
 | Auth | `Authorization: Bearer <accessToken>` |
 | En-têtes client | `X-Request-Id`, `X-Client-Version`, `X-Client-Platform`, `Accept-Language` |
-| Pagination | `?limit=50&cursor=<opaque>` → `{ data, pageInfo: { nextCursor, hasMore } }` |
+| Pagination | `?limit=50&cursor=<opaque>` → `{ items, nextCursor }` (`nextCursor: null` en fin de parcours) |
 | Tri | `?sort=dueDate:asc,priority:desc` (liste blanche par endpoint) |
-| Filtres | `?status=TODO,IN_PROGRESS&priority=HIGH&tagId=...&dueFrom=...&q=...` |
+| Filtres | `?status=TODO&priority=HIGH&tagIds=uuid1,uuid2&due=OVERDUE&projectId=...&inbox=true&q=...` |
 | Erreurs | RFC 9457 `application/problem+json` |
 | Idempotence | `Idempotency-Key` (UUID) sur `POST`/`PATCH` critiques, TTL 24 h |
 | Concurrence | `PATCH` accepte `If-Match: "<version>"` ; réponse `409` si divergence |
