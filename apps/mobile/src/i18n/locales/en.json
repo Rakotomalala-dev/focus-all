@@ -28,6 +28,100 @@
       "invalidCredentials": "Incorrect email or password.",
       "emailTaken": "An account already exists with this email.",
       "validation": "Check the email and the password (10 characters minimum)."
+    },
+    "forgot": {
+      "title": "Forgot password",
+      "subtitle": "Get a 30-minute link to choose a new password.",
+      "submit": "Send the link",
+      "link": "Forgot password?",
+      "sent": "If an account exists for this email, a reset link has just been sent.",
+      "back": "Back to sign in",
+      "invalidEmail": "Enter a valid email address."
+    },
+    "reset": {
+      "title": "New password",
+      "subtitle": "Choose a password of at least 10 characters, with two character types.",
+      "confirmPassword": "Confirm password",
+      "submit": "Save password",
+      "invalidTitle": "Invalid link",
+      "invalidBody": "This reset link is incomplete or has expired.",
+      "backToLogin": "Back to sign in",
+      "invalidPassword": "The password needs at least 10 characters and two character types.",
+      "mismatch": "The two passwords do not match."
+    }
+  },
+  "settings": {
+    "open": "Settings",
+    "back": "Back",
+    "signedOut": "Sign in to manage your account.",
+    "title": "Settings",
+    "avatarLabel": "{{name}}'s avatar",
+    "fields": {
+      "displayName": "Display name",
+      "avatarUrl": "Avatar URL",
+      "avatarPlaceholder": "Empty: initials are used",
+      "timezone": "Time zone (IANA)",
+      "language": "Language",
+      "weekStart": "Week starts on",
+      "timeFormat": "Time format",
+      "theme": "Theme",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "deletionPassword": "Current password",
+      "deletionConfirmation": "Type DELETE to confirm"
+    },
+    "profile": {
+      "title": "Profile",
+      "save": "Save profile",
+      "saved": "Profile saved."
+    },
+    "preferences": {
+      "title": "Preferences"
+    },
+    "languages": {
+      "fr": "Français",
+      "en": "English"
+    },
+    "weekStarts": {
+      "MONDAY": "Monday",
+      "SUNDAY": "Sunday"
+    },
+    "timeFormats": {
+      "H24": "24 h",
+      "H12": "12 h"
+    },
+    "themes": {
+      "SYSTEM": "System",
+      "LIGHT": "Light",
+      "DARK": "Dark"
+    },
+    "security": {
+      "title": "Password",
+      "passwordHint": "Changing it revokes every other session.",
+      "changePassword": "Change password",
+      "passwordChanged": "Password changed."
+    },
+    "sessions": {
+      "title": "Active sessions",
+      "empty": "No active session.",
+      "unknownDevice": "Unknown device",
+      "current": "current session",
+      "lastUsed": "Last activity: {{date}}",
+      "revoke": "Revoke this session",
+      "revokeAll": "Sign out every device"
+    },
+    "connections": {
+      "title": "Recent connections",
+      "active": "active",
+      "revoked": "revoked"
+    },
+    "danger": {
+      "title": "Danger zone",
+      "export": "Export my data",
+      "exported": "Export generated.",
+      "exportError": "Export is not possible right now.",
+      "deleteHint": "Deleting disables the account immediately. Data is permanently purged after 30 days.",
+      "delete": "Permanently delete my account"
     }
   },
   "projects": {

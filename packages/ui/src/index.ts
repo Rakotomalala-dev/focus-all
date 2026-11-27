@@ -2,4 +2,9 @@
 // interne (AGENTS §1.3), et les tokens restent accessibles via leur paquet.
 export { AppText, type AppTextProps, type TextTone } from "./app-text";
 export { Screen, type ScreenProps } from "./screen";
-export { useFocusTheme } from "./use-focus-theme";
+export {
+  FocusThemeProvider,
+  useFocusTheme,
+  type FocusThemeProviderProps,
+  type ThemeMode,
+} from "./use-focus-theme";

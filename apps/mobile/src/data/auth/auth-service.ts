@@ -1,4 +1,5 @@
-import type { LoginInput, RegisterInput } from "@focus/contracts";
+import type { LoginInput, ProfileUpdate, RegisterInput } from "@focus/contracts";
+import i18n from "../../i18n";
 import { queryClient } from "../query-client";
 import { authApi } from "./auth-instance";
 import { useSessionStore } from "./session-store";
@@ -11,6 +12,7 @@ async function loadUser(): Promise<void> {
   try {
     const user = await authApi.me();
     useSessionStore.getState().setUser(user);
+    void i18n.changeLanguage(user.locale);
   } catch (error) {
     useSessionStore.getState().clear();
     throw error;
@@ -57,7 +59,33 @@ export async function hydrateSession(): Promise<void> {
   useSessionStore.getState().restore(stored);
   try {
     useSessionStore.getState().setUser(await authApi.me());
+    const user = useSessionStore.getState().user;
+    if (user !== null) {
+      void i18n.changeLanguage(user.locale);
+    }
   } catch {
     useSessionStore.getState().clear();
   }
+}
+
+export async function updateProfile(input: ProfileUpdate): Promise<void> {
+  const user = await authApi.updateProfile(input);
+  useSessionStore.getState().setUser(user);
+  void i18n.changeLanguage(user.locale);
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  await authApi.requestPasswordReset(email);
+}
+
+export async function confirmPasswordReset(token: string, password: string): Promise<void> {
+  await authApi.confirmPasswordReset(token, password);
+}
+
+// Suppression logique côté serveur : la session locale tombe immédiatement,
+// même si l'e-mail de confirmation échoue.
+export async function deleteAccount(password: string): Promise<void> {
+  await authApi.deleteAccount({ password, confirmation: "DELETE" });
+  useSessionStore.getState().clear();
+  queryClient.clear();
 }

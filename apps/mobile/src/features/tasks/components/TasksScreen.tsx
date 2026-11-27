@@ -113,6 +113,7 @@ export function TasksScreen() {
             flexDirection: "row",
             alignItems: "flex-start",
             justifyContent: "space-between",
+            flexWrap: "wrap",
             gap: theme.spacing.sm,
           }}
         >
@@ -148,6 +149,26 @@ export function TasksScreen() {
             }}
           >
             <AppText tone="muted">{t("tasks.card.projects")}</AppText>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("settings.open")}
+            onPress={() => {
+              router.push("/settings");
+            }}
+            style={{
+              minHeight: 44,
+              minWidth: 44,
+              paddingHorizontal: theme.spacing.md,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: theme.radii.md,
+              borderWidth: theme.border.width,
+              borderColor: theme.colors.border,
+            }}
+          >
+            <AppText tone="muted">{t("settings.open")}</AppText>
           </Pressable>
 
           <Pressable

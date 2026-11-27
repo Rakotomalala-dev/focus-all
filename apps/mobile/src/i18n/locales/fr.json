@@ -28,6 +28,100 @@
       "invalidCredentials": "E-mail ou mot de passe incorrect.",
       "emailTaken": "Un compte existe déjà avec cet e-mail.",
       "validation": "Vérifiez l'e-mail et le mot de passe (10 caractères minimum)."
+    },
+    "forgot": {
+      "title": "Mot de passe oublié",
+      "subtitle": "Recevez un lien valable 30 minutes pour choisir un nouveau mot de passe.",
+      "submit": "Envoyer le lien",
+      "link": "Mot de passe oublié ?",
+      "sent": "Si un compte existe pour cet e-mail, un lien de réinitialisation vient d'être envoyé.",
+      "back": "Retour à la connexion",
+      "invalidEmail": "Saisissez une adresse e-mail valide."
+    },
+    "reset": {
+      "title": "Nouveau mot de passe",
+      "subtitle": "Choisissez un mot de passe d'au moins 10 caractères, avec deux types de caractères.",
+      "confirmPassword": "Confirmer le mot de passe",
+      "submit": "Enregistrer le mot de passe",
+      "invalidTitle": "Lien invalide",
+      "invalidBody": "Ce lien de réinitialisation est incomplet ou a expiré.",
+      "backToLogin": "Revenir à la connexion",
+      "invalidPassword": "Le mot de passe doit contenir au moins 10 caractères et deux types de caractères.",
+      "mismatch": "Les deux mots de passe ne correspondent pas."
+    }
+  },
+  "settings": {
+    "open": "Réglages",
+    "back": "Retour",
+    "signedOut": "Connectez-vous pour gérer votre compte.",
+    "title": "Réglages",
+    "avatarLabel": "Avatar de {{name}}",
+    "fields": {
+      "displayName": "Nom affiché",
+      "avatarUrl": "URL de l'avatar",
+      "avatarPlaceholder": "Vide : initiales utilisées",
+      "timezone": "Fuseau horaire (IANA)",
+      "language": "Langue",
+      "weekStart": "Début de semaine",
+      "timeFormat": "Format d'heure",
+      "theme": "Thème",
+      "currentPassword": "Mot de passe actuel",
+      "newPassword": "Nouveau mot de passe",
+      "deletionPassword": "Mot de passe actuel",
+      "deletionConfirmation": "Saisissez DELETE pour confirmer"
+    },
+    "profile": {
+      "title": "Profil",
+      "save": "Enregistrer le profil",
+      "saved": "Profil enregistré."
+    },
+    "preferences": {
+      "title": "Préférences"
+    },
+    "languages": {
+      "fr": "Français",
+      "en": "English"
+    },
+    "weekStarts": {
+      "MONDAY": "Lundi",
+      "SUNDAY": "Dimanche"
+    },
+    "timeFormats": {
+      "H24": "24 h",
+      "H12": "12 h"
+    },
+    "themes": {
+      "SYSTEM": "Système",
+      "LIGHT": "Clair",
+      "DARK": "Sombre"
+    },
+    "security": {
+      "title": "Mot de passe",
+      "passwordHint": "Le changement révoque toutes les autres sessions.",
+      "changePassword": "Changer le mot de passe",
+      "passwordChanged": "Mot de passe modifié."
+    },
+    "sessions": {
+      "title": "Sessions actives",
+      "empty": "Aucune session active.",
+      "unknownDevice": "Appareil inconnu",
+      "current": "session courante",
+      "lastUsed": "Dernière activité : {{date}}",
+      "revoke": "Révoquer cette session",
+      "revokeAll": "Déconnecter tous les appareils"
+    },
+    "connections": {
+      "title": "Dernières connexions",
+      "active": "active",
+      "revoked": "révoquée"
+    },
+    "danger": {
+      "title": "Zone sensible",
+      "export": "Exporter mes données",
+      "exported": "Export généré.",
+      "exportError": "Export impossible pour le moment.",
+      "deleteHint": "La suppression désactive immédiatement le compte. Les données sont purgées définitivement après 30 jours.",
+      "delete": "Supprimer définitivement mon compte"
     }
   },
   "projects": {

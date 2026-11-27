@@ -7,6 +7,7 @@ import { AuthScreen } from "./AuthScreen";
 const mocks = vi.hoisted(() => ({
   loginMutateAsync: vi.fn(),
   registerMutateAsync: vi.fn(),
+  resetMutateAsync: vi.fn(),
   loginResult: {
     isPending: false,
     isError: false,
@@ -17,6 +18,12 @@ const mocks = vi.hoisted(() => ({
     isError: false,
     error: null as unknown,
   },
+  resetResult: {
+    isPending: false,
+    isError: false,
+    isSuccess: false,
+    error: null as unknown,
+  },
 }));
 
 // Les mutations sont mockées : l'écran doit être vérifiable sans réseau, sans
@@ -24,16 +31,40 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../api/use-auth", () => ({
   useLogin: () => ({ ...mocks.loginResult, mutateAsync: mocks.loginMutateAsync }),
   useRegister: () => ({ ...mocks.registerResult, mutateAsync: mocks.registerMutateAsync }),
+  useRequestPasswordReset: () => ({
+    ...mocks.resetResult,
+    mutateAsync: mocks.resetMutateAsync,
+  }),
 }));
 
 describe("AuthScreen", () => {
   beforeEach(() => {
     mocks.loginMutateAsync.mockReset();
     mocks.registerMutateAsync.mockReset();
+    mocks.resetMutateAsync.mockReset();
     mocks.loginResult.isError = false;
     mocks.loginResult.error = null;
     mocks.registerResult.isError = false;
     mocks.registerResult.error = null;
+    mocks.resetResult.isError = false;
+    mocks.resetResult.isSuccess = false;
+    mocks.resetResult.error = null;
+  });
+
+  it("envoie une demande de réinitialisation sans révéler le compte", async () => {
+    mocks.resetMutateAsync.mockResolvedValue(undefined);
+
+    render(<AuthScreen />);
+
+    fireEvent.press(screen.getByLabelText("Mot de passe oublié ?"));
+    expect(screen.getByText("Mot de passe oublié")).toBeTruthy();
+
+    fireEvent.changeText(screen.getByLabelText("E-mail"), "ada@focus.local");
+    fireEvent.press(screen.getByLabelText("Envoyer le lien"));
+
+    await waitFor(() => {
+      expect(mocks.resetMutateAsync).toHaveBeenCalledWith("ada@focus.local");
+    });
   });
 
   it("ouvre en mode connexion sans champ de nom", () => {

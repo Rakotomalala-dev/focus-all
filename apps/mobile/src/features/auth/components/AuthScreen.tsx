@@ -1,4 +1,4 @@
-import { loginInputSchema, registerInputSchema } from "@focus/contracts";
+import { emailSchema, loginInputSchema, registerInputSchema } from "@focus/contracts";
 import { AppText, Screen, useFocusTheme } from "@focus/ui";
 import { useState } from "react";
 import { Controller, useForm, type Control } from "react-hook-form";
@@ -9,9 +9,9 @@ import {
   appErrorMessageKey,
   type AppErrorMessageKey,
 } from "../../../data/http/app-error";
-import { useLogin, useRegister } from "../api/use-auth";
+import { useLogin, useRegister, useRequestPasswordReset } from "../api/use-auth";
 
-type AuthMode = "login" | "register";
+type AuthMode = "login" | "register" | "forgot";
 
 type AuthForm = {
   readonly email: string;
@@ -23,7 +23,8 @@ type MessageKey =
   | AppErrorMessageKey
   | "auth.errors.invalidCredentials"
   | "auth.errors.emailTaken"
-  | "auth.errors.validation";
+  | "auth.errors.validation"
+  | "auth.forgot.invalidEmail";
 
 // Un formulaire unique pour les deux modes : les champs communs restent au même
 // endroit, et le contrat partagé porte les bornes (RF-01).
@@ -34,13 +35,29 @@ export function AuthScreen() {
   const [validationKey, setValidationKey] = useState<MessageKey | null>(null);
   const login = useLogin();
   const register = useRegister();
-  const mutation = mode === "login" ? login : register;
+  const reset = useRequestPasswordReset();
+  const mutation = mode === "login" ? login : mode === "register" ? register : reset;
 
-  const { control, handleSubmit, reset } = useForm<AuthForm>({
+  const { control, handleSubmit, reset: resetForm } = useForm<AuthForm>({
     defaultValues: { email: "", password: "", displayName: "" },
   });
 
   const submit = handleSubmit(async (values) => {
+    if (mode === "forgot") {
+      const parsed = emailSchema.safeParse(values.email);
+      if (!parsed.success) {
+        setValidationKey("auth.forgot.invalidEmail");
+        return;
+      }
+      setValidationKey(null);
+      try {
+        await reset.mutateAsync(parsed.data);
+      } catch {
+        // L'erreur est rendue via `mutation.error`.
+      }
+      return;
+    }
+
     if (mode === "login") {
       const parsed = loginInputSchema.safeParse({
         email: values.email,
@@ -79,10 +96,10 @@ export function AuthScreen() {
     }
   });
 
-  function switchMode(): void {
-    setMode(mode === "login" ? "register" : "login");
+  function switchMode(next: AuthMode): void {
+    setMode(next);
     setValidationKey(null);
-    reset();
+    resetForm();
   }
 
   function messageFor(error: unknown): MessageKey {
@@ -152,10 +169,22 @@ export function AuthScreen() {
       <View style={{ flex: 1, justifyContent: "center", gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.xs }}>
           <AppText tone="display">
-            {t(mode === "login" ? "auth.login.title" : "auth.register.title")}
+            {t(
+              mode === "login"
+                ? "auth.login.title"
+                : mode === "register"
+                  ? "auth.register.title"
+                  : "auth.forgot.title",
+            )}
           </AppText>
           <AppText tone="muted">
-            {t(mode === "login" ? "auth.login.subtitle" : "auth.register.subtitle")}
+            {t(
+              mode === "login"
+                ? "auth.login.subtitle"
+                : mode === "register"
+                  ? "auth.register.subtitle"
+                  : "auth.forgot.subtitle",
+            )}
           </AppText>
         </View>
 
@@ -164,14 +193,22 @@ export function AuthScreen() {
             ? renderField(control, "displayName", { autoComplete: "name" })
             : null}
           {renderField(control, "email", { email: true, autoComplete: "email" })}
-          {renderField(control, "password", {
-            secure: true,
-            autoComplete: mode === "login" ? "current-password" : "new-password",
-          })}
+          {mode === "forgot"
+            ? null
+            : renderField(control, "password", {
+                secure: true,
+                autoComplete: mode === "login" ? "current-password" : "new-password",
+              })}
           {mode === "register" ? (
             <AppText tone="muted">{t("auth.passwordHint")}</AppText>
           ) : null}
         </View>
+
+        {mode === "forgot" && reset.isSuccess ? (
+          <AppText accessibilityLiveRegion="polite" tone="muted">
+            {t("auth.forgot.sent")}
+          </AppText>
+        ) : null}
 
         {errorMessage === null ? null : (
           <AppText
@@ -186,7 +223,11 @@ export function AuthScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t(
-            mode === "login" ? "auth.login.submit" : "auth.register.submit",
+            mode === "login"
+              ? "auth.login.submit"
+              : mode === "register"
+                ? "auth.register.submit"
+                : "auth.forgot.submit",
           )}
           accessibilityState={{ disabled: mutation.isPending }}
           disabled={mutation.isPending}
@@ -206,21 +247,48 @@ export function AuthScreen() {
             <ActivityIndicator color={theme.colors.text.onAccent} />
           ) : (
             <AppText style={{ color: theme.colors.text.onAccent, fontWeight: "600" }}>
-              {t(mode === "login" ? "auth.login.submit" : "auth.register.submit")}
+              {t(
+                mode === "login"
+                  ? "auth.login.submit"
+                  : mode === "register"
+                    ? "auth.register.submit"
+                    : "auth.forgot.submit",
+              )}
             </AppText>
           )}
         </Pressable>
 
+        {mode === "login" ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("auth.forgot.link")}
+            onPress={() => {
+              switchMode("forgot");
+            }}
+            style={{ minHeight: 44, alignItems: "center", justifyContent: "center" }}
+          >
+            <AppText tone="muted">{t("auth.forgot.link")}</AppText>
+          </Pressable>
+        ) : null}
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t(
-            mode === "login" ? "auth.login.switch" : "auth.register.switch",
+            mode === "login" ? "auth.login.switch" : mode === "register" ? "auth.register.switch" : "auth.forgot.back",
           )}
-          onPress={switchMode}
+          onPress={() => {
+            switchMode(mode === "login" ? "register" : "login");
+          }}
           style={{ minHeight: 44, alignItems: "center", justifyContent: "center" }}
         >
           <AppText tone="muted">
-            {t(mode === "login" ? "auth.login.switch" : "auth.register.switch")}
+            {t(
+              mode === "login"
+                ? "auth.login.switch"
+                : mode === "register"
+                  ? "auth.register.switch"
+                  : "auth.forgot.back",
+            )}
           </AppText>
         </Pressable>
       </View>

@@ -1,2 +1,11 @@
-export { useLogin, useLogout, useRegister, useSession } from "./api/use-auth";
+export {
+  useConfirmPasswordReset,
+  useDeleteAccount,
+  useLogin,
+  useLogout,
+  useRegister,
+  useRequestPasswordReset,
+  useSession,
+} from "./api/use-auth";
 export { AuthScreen } from "./components/AuthScreen";
+export { ResetPasswordScreen } from "./components/ResetPasswordScreen";
