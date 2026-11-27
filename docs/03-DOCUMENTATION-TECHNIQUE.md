@@ -453,8 +453,9 @@ Un script n'est déclaré dans `package.json` que s'il a une cible : un script r
 | `S3_BUCKET` | non | `focus-dev` | bucket pièces jointes |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | non | `minio`/`minio123` | identifiants (MinIO local) |
 | `S3_FORCE_PATH_STYLE` | non | `true` | requis par MinIO |
-| `SMTP_HOST` / `SMTP_PORT` | non | `localhost`/`1025` | MailHog en dev |
-| `SMTP_USER` / `SMTP_PASSWORD` | non | — | vide en dev |
+| `SMTP_URL` | non | `smtp://localhost:1025` | MailHog en dev ; absent ⇒ e-mails non envoyés |
+| `MAIL_FROM` | non | `Focus <no-reply@focus.local>` | expéditeur des e-mails transactionnels |
+| `APP_PUBLIC_URL` | non | `http://localhost:8081` | base des liens de réinitialisation |
 | `MAIL_FROM` | non | `Focus <no-reply@focus.local>` | expéditeur |
 | `EXPO_ACCESS_TOKEN` | non | — | envoi de push via Expo (prod) |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | non | — | Web Push (V1.1) |
@@ -463,7 +464,7 @@ Un script n'est déclaré dans `package.json` que s'il a une cible : un script r
 | `SYNC_RETENTION_DAYS` | non | `90` | rétention du journal de sync |
 | `FEATURE_FLAGS` | non | — | `eisenhower=false,pomodoro=false` (V1.x) |
 
-**Sous-ensemble validé au démarrage (état réel).** `apps/api/src/config/env.schema.ts` valide, via Zod, les seules variables que l'API lit aujourd'hui : `NODE_ENV`, `PORT`, `API_PREFIX`, `CORS_ORIGINS`, `JWT_ACCESS_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`, `JWT_ISSUER`, `JWT_AUDIENCE`, `ARGON2_MEMORY_KIB`, `ARGON2_TIME_COST`. `DATABASE_URL` est lue directement par Prisma (client et CLI) et n'est pas dupliquée dans le schéma. Le chargement a lieu une fois, à la création de l'application (`AppConfigModule`) :
+**Sous-ensemble validé au démarrage (état réel).** `apps/api/src/config/env.schema.ts` valide, via Zod, les seules variables que l'API lit aujourd'hui : `NODE_ENV`, `PORT`, `API_PREFIX`, `CORS_ORIGINS`, `JWT_ACCESS_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`, `JWT_ISSUER`, `JWT_AUDIENCE`, `ARGON2_MEMORY_KIB`, `ARGON2_TIME_COST`, `SMTP_URL`, `MAIL_FROM`, `APP_PUBLIC_URL`. `DATABASE_URL` est lue directement par Prisma (client et CLI) et n'est pas dupliquée dans le schéma. Le chargement a lieu une fois, à la création de l'application (`AppConfigModule`) :
 
 - une valeur invalide empêche le boot (fail-fast, R4) ; le message cite la variable et la règle, **jamais sa valeur** (S-5/S-12) ;
 - `PORT` vide retombe sur `4000`, mais un `PORT` non numérique échoue (jamais de port arbitraire) ;
@@ -626,7 +627,15 @@ sequenceDiagram
 
 **Réutilisation détectée** : si un refresh token déjà consommé est présenté, l'API révoque toutes les sessions de la `familyId`, journalise l'événement et renvoie `401 SESSION_REVOKED`. Aucun token n'est jamais stocké en clair.
 
-**État implémenté (2026-11-25, M0 terminé).** Le flux complet existe et est couvert par `auth.http.spec.ts` sur une vraie base : `POST /auth/register` (utilisateur + workspace personnel + session, e-mail `citext` unique, Argon2id), `POST /auth/login`, `POST /auth/refresh` (rotation, détection de réutilisation et révocation de la famille), `POST /auth/logout`, `GET /me`. Les refresh tokens sont stockés hachés en SHA-256 ; leur valeur en clair n'est jamais persistée ni journalisée. `AuthGuard` reste global et vérifie le JWT d'accès (issuer, audience, algorithme), `@Public()` ouvre les seules routes `register`/`login`/`refresh`. En développement, `pnpm api:token` reste disponible pour signer un jeton hors ligne.
+**État implémenté (2026-11-27, domaine Compte et sécurité).** Le flux complet est couvert par `auth.http.spec.ts` et `account.http.spec.ts` sur une vraie base : `POST /auth/register` (utilisateur + workspace personnel + session, e-mail `citext` unique, Argon2id), `POST /auth/login`, `POST /auth/refresh` (rotation, détection de réutilisation et révocation de la famille), `POST /auth/logout`, `GET /me`. Les refresh tokens sont stockés hachés en SHA-256 ; leur valeur en clair n'est jamais persistée ni journalisée. `AuthGuard` reste global et vérifie le JWT d'accès (issuer, audience, algorithme), `@Public()` ouvre les routes `register`, `login`, `refresh` et les deux routes de réinitialisation.
+
+**Verrouillage (RF-01).** `LoginAttempt` compte les échecs par e-mail normalisé, y compris pour un compte inexistant. Les paliers sont 1, 5 puis 15 minutes ; la réponse est `429` avec `retryAfterSeconds` et le code `auth.too_many_attempts`. Une connexion réussie efface le compteur. Le verrouillage est persistant, donc partagé entre instances.
+
+**Réinitialisation (RF-02).** `POST /auth/password-reset/request` répond toujours `202`, même pour un e-mail inconnu. Le jeton est 32 octets aléatoires, seul son SHA-256 est stocké, sa durée de vie est de 30 minutes et il est à usage unique. La confirmation révoque toutes les sessions. Le port `MAILER` isole SMTP (`SMTP_URL`, `MAIL_FROM`, lien basé sur `APP_PUBLIC_URL`) ; les tests injectent une boîte mémoire et aucun jeton n'est journalisé.
+
+**Profil, préférences et suppression (RF-03/04/06/70).** `PATCH /me` valide le fuseau IANA et met à jour nom, avatar, langue (`fr`/`en`), début de semaine, format d'heure et thème. `GET /auth/sessions` liste les sessions avec plateforme, appareil et dernière activité (`sid` du JWT identifie la session courante) ; `DELETE /auth/sessions/:id` reste scopé à l'utilisateur. `GET /auth/connections` regroupe l'historique par famille. `GET /me/export` produit un export JSON synchrone. `DELETE /me` exige le mot de passe et le littéral `DELETE`, révoque sessions et jetons, envoie un e-mail de confirmation et positionne `deletionRequestedAt` ; la purge définitive à 30 jours s'exécute via `pnpm --filter @focus/api db:purge`.
+
+**Limites assumées.** La MFA et l'OAuth restent en V1.2/V1.1. L'envoi d'e-mail est synchrone après la réponse HTTP (pas encore de job BullMQ) ; l'export est synchrone et volontairement minimal (RF-71 complet hors périmètre). `pnpm api:token` reste disponible en développement pour signer un jeton hors ligne.
 
 ### 6.3 Exemples d'appels
 

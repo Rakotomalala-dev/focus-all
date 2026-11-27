@@ -793,14 +793,18 @@ Codes applicatifs stables : `VALIDATION_ERROR`, `UNAUTHENTICATED`, `SESSION_EXPI
 | `POST` | `/auth/login` | connexion, retourne access + refresh (ou cookie) |
 | `POST` | `/auth/refresh` | rotation du refresh token |
 | `POST` | `/auth/logout` | révoque la session courante |
-| `POST` | `/auth/logout-all` | révoque toutes les sessions |
-| `POST` | `/auth/forgot-password` | envoi d'e-mail de réinitialisation |
-| `POST` | `/auth/reset-password` | consommation du token de réinitialisation |
+| `POST` | `/auth/password-reset/request` | demande de réinitialisation (réponse 202 constante) |
+| `POST` | `/auth/password-reset/confirm` | consommation du jeton de réinitialisation |
+| `POST` | `/auth/password/change` | changement de mot de passe authentifié |
+| `GET` | `/auth/sessions` | sessions actives (session courante marquée) |
+| `DELETE` | `/auth/sessions` | révoque toutes les sessions |
+| `DELETE` | `/auth/sessions/:id` | révoque une session |
+| `GET` | `/auth/connections` | dernières connexions par famille |
 | `GET` | `/auth/oauth/:provider` | démarrage du flux OAuth (V1.1) |
 | `GET` | `/me` | profil + préférences + workspaces |
-| `PATCH` | `/me` | mise à jour du profil (timezone, locale, nom) |
-| `PATCH` | `/me/settings` | préférences d'application |
-| `DELETE` | `/me` | suppression de compte (soft + purge différée) |
+| `PATCH` | `/me` | profil et préférences (nom, avatar, fuseau, langue, semaine, heure, thème) |
+| `DELETE` | `/me` | suppression de compte (soft + purge différée à 30 jours) |
+| `GET` | `/me/export` | export JSON synchrone des données du compte |
 | `GET` | `/workspaces` | liste des workspaces de l'utilisateur |
 | `GET` | `/workspaces/:id` | détail + membres |
 | `POST` | `/workspaces/:id/invitations` | invitation (V1.3) |
