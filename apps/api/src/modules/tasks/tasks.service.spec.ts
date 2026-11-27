@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { AuthContext } from "../auth/auth-context";
 import { DomainError } from "../../common/domain-error";
 import { InMemoryTaskRepository } from "./task.repository";
+import type { ProjectRepository } from "../projects/project.repository";
+import type { TagRepository } from "../tags/tag.repository";
 import { TasksService } from "./tasks.service";
 
 const CONTEXT: AuthContext = {
@@ -11,7 +13,11 @@ const CONTEXT: AuthContext = {
 };
 
 function createService(): TasksService {
-  return new TasksService(new InMemoryTaskRepository());
+  return new TasksService(
+    new InMemoryTaskRepository(),
+    {} as TagRepository,
+    {} as ProjectRepository,
+  );
 }
 
 describe("TasksService.create", () => {
@@ -89,10 +95,10 @@ describe("TasksService.list", () => {
     await expect(service.list(CONTEXT, { cursor: "bof" })).rejects.toMatchObject(invalidCursor);
     // JSON valide mais clé de tri incomplète, puis id non UUID.
     await expect(
-      service.list(CONTEXT, { cursor: base64('{"sortOrder":"000001"}') }),
+      service.list(CONTEXT, { cursor: base64('{"sort":"MANUAL","value":"000001"}') }),
     ).rejects.toMatchObject(invalidCursor);
     await expect(
-      service.list(CONTEXT, { cursor: base64('{"sortOrder":"000001","id":"42"}') }),
+      service.list(CONTEXT, { cursor: base64('{"sort":"MANUAL","value":"000001","id":"42"}') }),
     ).rejects.toMatchObject(invalidCursor);
   });
 
@@ -105,9 +111,10 @@ describe("TasksService.list", () => {
     const cursor = first.nextCursor ?? "";
     const decoded: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
 
-    // Le curseur expose (sortOrder, id) de la dernière tâche, pas un rang.
+    // Le curseur expose la clé de tri et l'id de la dernière tâche, pas un rang.
     expect(decoded).toMatchObject({
-      sortOrder: first.items[0]?.sortOrder,
+      sort: "MANUAL",
+      value: first.items[0]?.sortOrder,
       id: first.items[0]?.id,
     });
   });

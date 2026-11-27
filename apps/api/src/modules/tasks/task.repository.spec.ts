@@ -27,6 +27,8 @@ function task(id: string, sortOrder: string): StoredTask {
     createdAt: TIMESTAMP,
     updatedAt: TIMESTAMP,
     tagIds: [],
+    reminders: [],
+    recurrenceMode: "FIXED",
   };
 }
 
@@ -37,7 +39,7 @@ const THREE_TASKS: readonly StoredTask[] = [
 ];
 
 describe("isAfterCursor", () => {
-  const cursor: TaskCursor = { sortOrder: "000002", id: ID_B };
+  const cursor: TaskCursor = { sort: "MANUAL", value: "000002", id: ID_B };
 
   it("compare d'abord sortOrder", () => {
     expect(isAfterCursor(task(ID_C, "000003"), cursor)).toBe(true);
@@ -58,10 +60,12 @@ describe("InMemoryTaskRepository.list (keyset)", () => {
   it("renvoie la page qui suit la clé du curseur", async () => {
     const repository = InMemoryTaskRepository.withTasks(THREE_TASKS);
 
-    const page = await repository.list({}, WORKSPACE, {
-      limit: 1,
-      after: { sortOrder: "000001", id: ID_A },
-    });
+    const page = await repository.list(
+      {},
+      WORKSPACE,
+      { limit: 1, after: { sort: "MANUAL", value: "000001", id: ID_A } },
+      "MANUAL",
+    );
 
     expect(page.items.map((item) => item.id)).toEqual([ID_B]);
     expect(page.hasMore).toBe(true);
@@ -69,21 +73,22 @@ describe("InMemoryTaskRepository.list (keyset)", () => {
 
   it("ne saute ni ne répète aucune tâche si une tâche s'insère avant le curseur", async () => {
     const before = InMemoryTaskRepository.withTasks(THREE_TASKS);
-    const first = await before.list({}, WORKSPACE, { limit: 2 });
+    const first = await before.list({}, WORKSPACE, { limit: 2 }, "MANUAL");
     const lastSeen = first.items.at(-1);
 
     expect(first.items.map((item) => item.id)).toEqual([ID_A, ID_B]);
     expect(lastSeen).toBeDefined();
 
     const cursor: TaskCursor = {
-      sortOrder: lastSeen?.sortOrder ?? "",
+      sort: "MANUAL",
+      value: lastSeen?.sortOrder ?? "",
       id: lastSeen?.id ?? "",
     };
 
     // Une tâche apparaît entre les deux pages et se place en tête de liste.
     // Avec un curseur d'offset, la page 2 aurait répété ID_B et sauté ID_C.
     const afterInsert = InMemoryTaskRepository.withTasks([task(ID_D, "000000"), ...THREE_TASKS]);
-    const second = await afterInsert.list({}, WORKSPACE, { limit: 2, after: cursor });
+    const second = await afterInsert.list({}, WORKSPACE, { limit: 2, after: cursor }, "MANUAL");
 
     expect(second.items.map((item) => item.id)).toEqual([ID_C]);
   });
@@ -91,8 +96,8 @@ describe("InMemoryTaskRepository.list (keyset)", () => {
   it("signale hasMore sans compter la collection entière", async () => {
     const repository = InMemoryTaskRepository.withTasks(THREE_TASKS);
 
-    const all = await repository.list({}, WORKSPACE, { limit: 3 });
-    const partial = await repository.list({}, WORKSPACE, { limit: 2 });
+    const all = await repository.list({}, WORKSPACE, { limit: 3 }, "MANUAL");
+    const partial = await repository.list({}, WORKSPACE, { limit: 2 }, "MANUAL");
 
     expect(all.items).toHaveLength(3);
     expect(all.hasMore).toBe(false);

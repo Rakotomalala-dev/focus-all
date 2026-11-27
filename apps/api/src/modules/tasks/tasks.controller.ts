@@ -13,7 +13,7 @@ import {
   Res,
 } from "@nestjs/common";
 import type { FastifyReply } from "fastify";
-import type { Task, TaskListResponse } from "@focus/contracts";
+import type { Task, TaskListResponse, TrashResponse } from "@focus/contracts";
 import type { AuthContext } from "../auth/auth-context";
 import { CurrentAuth } from "../auth/current-auth.decorator";
 import { TasksService } from "./tasks.service";
@@ -48,6 +48,25 @@ export class TasksController {
     return this.tasks.list(auth, query);
   }
 
+  // Routes littérales déclarées avant `:id` : `trash` et `order` ne doivent
+  // jamais être interprétés comme des UUID.
+  @Get("trash")
+  trash(@CurrentAuth() auth: AuthContext): Promise<TrashResponse> {
+    return this.tasks.trash(auth);
+  }
+
+  @Patch("order")
+  @HttpCode(200)
+  reorder(@CurrentAuth() auth: AuthContext, @Body() body: unknown): Promise<readonly Task[]> {
+    return this.tasks.reorder(auth, body);
+  }
+
+  @Post("inbox/empty")
+  @HttpCode(200)
+  emptyInbox(@CurrentAuth() auth: AuthContext, @Body() body: unknown): Promise<{ moved: number }> {
+    return this.tasks.emptyInbox(auth, body);
+  }
+
   @Get(":id")
   async findById(
     @CurrentAuth() auth: AuthContext,
@@ -57,6 +76,12 @@ export class TasksController {
     const task = await this.tasks.findById(auth, id);
     publishVersion(reply, task);
     return task;
+  }
+
+  @Post(":id/restore")
+  @HttpCode(200)
+  restore(@CurrentAuth() auth: AuthContext, @Param("id") id: string): Promise<Task> {
+    return this.tasks.restore(auth, id);
   }
 
   // La version attendue peut venir du corps (`version`) ou d'`If-Match`.

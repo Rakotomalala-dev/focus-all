@@ -732,6 +732,85 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NONE",
+                "LOW",
+                "MEDIUM",
+                "HIGH",
+                "URGENT"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MANUAL",
+                "DUE_DATE",
+                "PRIORITY",
+                "CREATED_AT",
+                "TITLE"
+              ]
+            }
+          },
+          {
+            "name": "due",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OVERDUE",
+                "TODAY",
+                "NEXT_7_DAYS",
+                "NONE"
+              ]
+            }
+          },
+          {
+            "name": "tagIds",
+            "in": "query",
+            "description": "UUID séparés par des virgules (ET).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Recherche plein texte sans accents.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "parentId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "inbox",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "includeCompleted",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -811,6 +890,149 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/order": {
+      "patch": {
+        "summary": "Réordonner les tâches (ordre fractionnaire persistant)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tâches dans leur nouvel ordre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Identifiants invalides ou tâches hors workspace",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/inbox/empty": {
+      "post": {
+        "summary": "Vider l'Inbox vers un projet",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InboxEmpty"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Nombre de tâches déplacées",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "moved"
+                  ],
+                  "properties": {
+                    "moved": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Projet invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Projet archivé",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/trash": {
+      "get": {
+        "summary": "Lister la corbeille (tâches et projets, 30 jours)",
+        "responses": {
+          "200": {
+            "description": "Éléments supprimés et restaurables",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashResponse"
                 }
               }
             }
@@ -1078,6 +1300,802 @@
           }
         }
       }
+    },
+    "/api/v1/tasks/{id}/restore": {
+      "post": {
+        "summary": "Restaurer une tâche depuis la corbeille",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tâche restaurée avec ses sous-tâches",
+            "headers": {
+              "ETag": {
+                "description": "Version courante ; à renvoyer tel quel dans `If-Match`.",
+                "schema": {
+                  "type": "string",
+                  "example": "\"3\""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Identifiant invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tâche introuvable dans la corbeille",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "summary": "Lister les projets du workspace courant",
+        "responses": {
+          "200": {
+            "description": "Projets triés par ordre manuel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer un projet",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Projet créé",
+            "headers": {
+              "Location": {
+                "description": "URL du projet créé",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Version courante ; à renvoyer tel quel dans `If-Match`.",
+                "schema": {
+                  "type": "string",
+                  "example": "\"3\""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Limite de projets atteinte",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/order": {
+      "patch": {
+        "summary": "Réordonner les projets",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Projets dans leur nouvel ordre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Project"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Identifiants invalides ou projets hors workspace",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}": {
+      "get": {
+        "summary": "Lire un projet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Projet demandé",
+            "headers": {
+              "ETag": {
+                "description": "Version courante ; à renvoyer tel quel dans `If-Match`.",
+                "schema": {
+                  "type": "string",
+                  "example": "\"3\""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Projet introuvable dans ce workspace",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Modifier, archiver ou désarchiver un projet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Version attendue (`3`, `\"3\"` ou `W/\"3\"`). Obsolète → `412` ; absente et sans `version` dans le corps → `400`.",
+            "schema": {
+              "type": "string",
+              "example": "\"3\""
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Projet mis à jour, `version` incrémentée",
+            "headers": {
+              "ETag": {
+                "description": "Version courante ; à renvoyer tel quel dans `If-Match`.",
+                "schema": {
+                  "type": "string",
+                  "example": "\"3\""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide ou version absente",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Projet introuvable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version obsolète",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Version obsolète via If-Match",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer un projet et ses tâches (corbeille)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "description": "Version attendue (`3`, `\"3\"` ou `W/\"3\"`). Obsolète → `412` ; absente et sans `version` dans le corps → `400`.",
+            "schema": {
+              "type": "string",
+              "example": "\"3\""
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Projet supprimé, sans corps"
+          },
+          "400": {
+            "description": "Identifiant ou version attendue invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Projet introuvable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version obsolète",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Version obsolète via If-Match",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/restore": {
+      "post": {
+        "summary": "Restaurer un projet depuis la corbeille",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Projet restauré avec ses tâches",
+            "headers": {
+              "ETag": {
+                "description": "Version courante ; à renvoyer tel quel dans `If-Match`.",
+                "schema": {
+                  "type": "string",
+                  "example": "\"3\""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Identifiant invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Projet introuvable dans la corbeille",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tags": {
+      "get": {
+        "summary": "Lister les tags du workspace",
+        "responses": {
+          "200": {
+            "description": "Tags triés par nom normalisé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer un tag",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tag créé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tag"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nom déjà utilisé ou limite atteinte",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tags/ensure": {
+      "post": {
+        "summary": "Créer les tags manquants et renvoyer les existants (saisie rapide)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "names"
+                ],
+                "properties": {
+                  "names": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tags résolus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Tag"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Limite de tags atteinte",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tags/{id}": {
+      "patch": {
+        "summary": "Renommer ou recolorer un tag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tag mis à jour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tag"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tag introuvable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nom déjà utilisé",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer un tag et retirer ses références des tâches",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Tag supprimé, sans corps"
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tag introuvable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1088,7 +2106,7 @@
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 500
           },
           "description": {
             "type": "string",
@@ -1098,7 +2116,19 @@
             "type": "string",
             "format": "uuid"
           },
+          "parentId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "dueTime": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "startDate": {
             "type": "string",
             "format": "date"
           },
@@ -1121,6 +2151,33 @@
             },
             "maxItems": 20,
             "default": []
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "maxItems": 10,
+            "default": []
+          },
+          "recurrenceRule": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "recurrenceMode": {
+            "type": "string",
+            "enum": [
+              "FIXED",
+              "AFTER_COMPLETION"
+            ],
+            "default": "FIXED"
+          },
+          "estimateMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
           },
           "id": {
             "type": "string",
@@ -1181,7 +2238,7 @@
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 500
           },
           "description": {
             "type": "string",
@@ -1191,7 +2248,19 @@
             "type": "string",
             "format": "uuid"
           },
+          "parentId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "dueTime": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "startDate": {
             "type": "string",
             "format": "date"
           },
@@ -1214,6 +2283,33 @@
             },
             "maxItems": 20,
             "default": []
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "maxItems": 10,
+            "default": []
+          },
+          "recurrenceRule": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "recurrenceMode": {
+            "type": "string",
+            "enum": [
+              "FIXED",
+              "AFTER_COMPLETION"
+            ],
+            "default": "FIXED"
+          },
+          "estimateMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
           }
         },
         "required": [
@@ -1227,11 +2323,18 @@
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 500
           },
           "description": {
-            "type": "string",
-            "maxLength": 10000
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "projectId": {
             "anyOf": [
@@ -1244,9 +2347,49 @@
               }
             ]
           },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "dueDate": {
-            "type": "string",
-            "format": "date"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dueTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "priority": {
             "type": "string",
@@ -1265,6 +2408,45 @@
               "format": "uuid"
             },
             "maxItems": 20
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "maxItems": 10
+          },
+          "recurrenceRule": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recurrenceMode": {
+            "type": "string",
+            "enum": [
+              "FIXED",
+              "AFTER_COMPLETION"
+            ]
+          },
+          "estimateMinutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1440
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "status": {
             "type": "string",
@@ -1293,7 +2475,7 @@
                 "title": {
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 200
+                  "maxLength": 500
                 },
                 "description": {
                   "type": "string",
@@ -1303,7 +2485,19 @@
                   "type": "string",
                   "format": "uuid"
                 },
+                "parentId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
                 "dueDate": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "dueTime": {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                "startDate": {
                   "type": "string",
                   "format": "date"
                 },
@@ -1326,6 +2520,33 @@
                   },
                   "maxItems": 20,
                   "default": []
+                },
+                "reminders": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "maxItems": 10,
+                  "default": []
+                },
+                "recurrenceRule": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 400
+                },
+                "recurrenceMode": {
+                  "type": "string",
+                  "enum": [
+                    "FIXED",
+                    "AFTER_COMPLETION"
+                  ],
+                  "default": "FIXED"
+                },
+                "estimateMinutes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1440
                 },
                 "id": {
                   "type": "string",
@@ -1375,6 +2596,769 @@
                 "completedAt",
                 "sortOrder",
                 "version",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "TaskOrder": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectOrder": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "additionalProperties": false
+      },
+      "InboxEmpty": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      },
+      "TrashResponse": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 10000
+                },
+                "projectId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "parentId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "dueDate": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "dueTime": {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                "startDate": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "NONE",
+                    "LOW",
+                    "MEDIUM",
+                    "HIGH",
+                    "URGENT"
+                  ],
+                  "default": "NONE"
+                },
+                "tagIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "maxItems": 20,
+                  "default": []
+                },
+                "reminders": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "maxItems": 10,
+                  "default": []
+                },
+                "recurrenceRule": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 400
+                },
+                "recurrenceMode": {
+                  "type": "string",
+                  "enum": [
+                    "FIXED",
+                    "AFTER_COMPLETION"
+                  ],
+                  "default": "FIXED"
+                },
+                "estimateMinutes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1440
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "TODO",
+                    "IN_PROGRESS",
+                    "DONE",
+                    "CANCELLED"
+                  ]
+                },
+                "completedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sortOrder": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "title",
+                "id",
+                "status",
+                "completedAt",
+                "sortOrder",
+                "version",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "slate",
+                        "gray",
+                        "red",
+                        "orange",
+                        "amber",
+                        "green",
+                        "teal",
+                        "blue",
+                        "indigo",
+                        "violet",
+                        "pink",
+                        "brown"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sortOrder": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "archivedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "color",
+                "description",
+                "sortOrder",
+                "archivedAt",
+                "version",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "tasks",
+          "projects"
+        ],
+        "additionalProperties": false
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "slate",
+                  "gray",
+                  "red",
+                  "orange",
+                  "amber",
+                  "green",
+                  "teal",
+                  "blue",
+                  "indigo",
+                  "violet",
+                  "pink",
+                  "brown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sortOrder": {
+            "type": "string",
+            "minLength": 1
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "description",
+          "sortOrder",
+          "archivedAt",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectDraft": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "slate",
+              "gray",
+              "red",
+              "orange",
+              "amber",
+              "green",
+              "teal",
+              "blue",
+              "indigo",
+              "violet",
+              "pink",
+              "brown"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "slate",
+                  "gray",
+                  "red",
+                  "orange",
+                  "amber",
+                  "green",
+                  "teal",
+                  "blue",
+                  "indigo",
+                  "violet",
+                  "pink",
+                  "brown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProjectListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "slate",
+                        "gray",
+                        "red",
+                        "orange",
+                        "amber",
+                        "green",
+                        "teal",
+                        "blue",
+                        "indigo",
+                        "violet",
+                        "pink",
+                        "brown"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sortOrder": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "archivedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "color",
+                "description",
+                "sortOrder",
+                "archivedAt",
+                "version",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "Tag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "slate",
+                  "gray",
+                  "red",
+                  "orange",
+                  "amber",
+                  "green",
+                  "teal",
+                  "blue",
+                  "indigo",
+                  "violet",
+                  "pink",
+                  "brown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "TagDraft": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "slate",
+              "gray",
+              "red",
+              "orange",
+              "amber",
+              "green",
+              "teal",
+              "blue",
+              "indigo",
+              "violet",
+              "pink",
+              "brown"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "TagUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "slate",
+                  "gray",
+                  "red",
+                  "orange",
+                  "amber",
+                  "green",
+                  "teal",
+                  "blue",
+                  "indigo",
+                  "violet",
+                  "pink",
+                  "brown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "TagListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "slate",
+                        "gray",
+                        "red",
+                        "orange",
+                        "amber",
+                        "green",
+                        "teal",
+                        "blue",
+                        "indigo",
+                        "violet",
+                        "pink",
+                        "brown"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "color",
                 "createdAt",
                 "updatedAt"
               ],
@@ -1620,6 +3604,9 @@
               "SYSTEM"
             ]
           },
+          "quickAddParsingEnabled": {
+            "type": "boolean"
+          },
           "workspaces": {
             "type": "array",
             "items": {
@@ -1666,6 +3653,7 @@
           "weekStartsOn",
           "timeFormat",
           "theme",
+          "quickAddParsingEnabled",
           "workspaces"
         ],
         "additionalProperties": false
@@ -1723,6 +3711,9 @@
               "DARK",
               "SYSTEM"
             ]
+          },
+          "quickAddParsingEnabled": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -2106,6 +4097,9 @@
                   "SYSTEM"
                 ]
               },
+              "quickAddParsingEnabled": {
+                "type": "boolean"
+              },
               "workspaces": {
                 "type": "array",
                 "items": {
@@ -2152,6 +4146,7 @@
               "weekStartsOn",
               "timeFormat",
               "theme",
+              "quickAddParsingEnabled",
               "workspaces"
             ],
             "additionalProperties": false
@@ -2305,7 +4300,7 @@
                         "title": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 200
+                          "maxLength": 500
                         },
                         "description": {
                           "type": "string",
@@ -2315,7 +4310,19 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "parentId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
                         "dueDate": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "dueTime": {
+                          "type": "string",
+                          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "startDate": {
                           "type": "string",
                           "format": "date"
                         },
@@ -2338,6 +4345,33 @@
                           },
                           "maxItems": 20,
                           "default": []
+                        },
+                        "reminders": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "maxItems": 10,
+                          "default": []
+                        },
+                        "recurrenceRule": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 400
+                        },
+                        "recurrenceMode": {
+                          "type": "string",
+                          "enum": [
+                            "FIXED",
+                            "AFTER_COMPLETION"
+                          ],
+                          "default": "FIXED"
+                        },
+                        "estimateMinutes": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1440
                         },
                         "id": {
                           "type": "string",
@@ -2569,7 +4603,7 @@
                 "title": {
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 200
+                  "maxLength": 500
                 },
                 "description": {
                   "type": "string",
@@ -2579,7 +4613,19 @@
                   "type": "string",
                   "format": "uuid"
                 },
+                "parentId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
                 "dueDate": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "dueTime": {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                "startDate": {
                   "type": "string",
                   "format": "date"
                 },
@@ -2602,6 +4648,33 @@
                   },
                   "maxItems": 20,
                   "default": []
+                },
+                "reminders": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "maxItems": 10,
+                  "default": []
+                },
+                "recurrenceRule": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 400
+                },
+                "recurrenceMode": {
+                  "type": "string",
+                  "enum": [
+                    "FIXED",
+                    "AFTER_COMPLETION"
+                  ],
+                  "default": "FIXED"
+                },
+                "estimateMinutes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1440
                 },
                 "id": {
                   "type": "string",

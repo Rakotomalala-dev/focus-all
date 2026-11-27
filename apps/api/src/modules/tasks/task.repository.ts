@@ -1,29 +1,48 @@
 import { Injectable } from "@nestjs/common";
-import type { Task, TaskDraft, TaskPriority, TaskStatus } from "@focus/contracts";
+import type {
+  DueFilter,
+  Task,
+  TaskDraft,
+  TaskPriority,
+  TaskSort,
+  TaskStatus,
+} from "@focus/contracts";
 import { uuidV7 } from "../../common/uuid-v7";
 
 // Entité stockée : le scope d'appartenance vit ici et nulle part ailleurs.
 // Il n'apparaît jamais dans une réponse HTTP (N-7), d'où la séparation avec
 // le type public `Task` du contrat.
-export type StoredTask = Task & { readonly workspaceId: string };
+export type StoredTask = Task & {
+  readonly workspaceId: string;
+  readonly deletedAt?: string;
+};
 
 // Retire le scope avant de rendre l'entité : la seule sortie autorisée est
 // `Task`, donc l'oubli devient une erreur de compilation, pas une fuite.
 function toTask(stored: StoredTask): Task {
-  const { workspaceId, ...task } = stored;
+  const { workspaceId, deletedAt, ...task } = stored;
   void workspaceId;
+  void deletedAt;
   return task;
 }
 
 export type TaskFilters = {
   readonly status?: TaskStatus;
+  readonly priority?: TaskPriority;
   readonly projectId?: string;
+  readonly inbox?: boolean;
+  readonly parentId?: string;
+  readonly tagIds?: readonly string[];
+  readonly due?: DueFilter;
+  readonly q?: string;
+  readonly includeCompleted?: boolean;
 };
 
-// Clé de tri d'une tâche : (sortOrder, id). Le curseur transporte cette clé,
+// Clé de tri d'une tâche : le curseur transporte la valeur de tri et l'id,
 // jamais une position, pour que la pagination reste juste quand la liste change.
 export type TaskCursor = {
-  readonly sortOrder: string;
+  readonly sort: TaskSort;
+  readonly value: string | null;
   readonly id: string;
 };
 
@@ -37,40 +56,45 @@ export type TaskPageResult = {
   readonly hasMore: boolean;
 };
 
-// Champs modifiables : la clé absente ne change rien (PATCH partiel).
+// Champs modifiables : la clé absente ne change rien (PATCH partiel), `null`
+// efface explicitement une valeur optionnelle.
 export type TaskPatch = {
   readonly title?: string;
-  readonly description?: string;
-  // `null` remet la tâche dans l'Inbox ; `undefined` ne change rien.
+  readonly description?: string | null;
   readonly projectId?: string | null;
-  readonly dueDate?: string;
+  readonly parentId?: string | null;
+  readonly dueDate?: string | null;
+  readonly dueTime?: string | null;
+  readonly startDate?: string | null;
   readonly priority?: TaskPriority;
   readonly tagIds?: readonly string[];
+  readonly reminders?: readonly string[];
+  readonly recurrenceRule?: string | null;
+  readonly recurrenceMode?: "FIXED" | "AFTER_COMPLETION";
+  readonly estimateMinutes?: number | null;
   readonly status?: TaskStatus;
 };
 
-// Résultat explicite d'une mutation : le service traduit `conflict` en 409
-// plutôt que de deviner à partir d'une valeur nulle.
 export type MutationResult =
   | { readonly status: "ok"; readonly task: Task }
   | { readonly status: "not_found" }
   | { readonly status: "conflict"; readonly currentVersion: number };
 
-// Métadonnées d'une écriture : elles ne changent pas la règle métier, mais le
-// journal de sync a besoin de l'acteur et du `clientMutationId` idempotent, et
-// une création hors ligne impose son identifiant UUID v7.
 export type MutationOptions = {
   readonly id?: string;
   readonly actorId?: string;
   readonly clientMutationId?: string;
 };
 
-// Port du repository (N-1/N-2) : le service ne connaît ni Prisma ni le stockage.
-// Le remplacement par un repository Prisma se fera sans toucher au service.
 export interface TaskRepository {
   create(draft: TaskDraft, workspaceId: string, options?: MutationOptions): Promise<Task>;
   findById(id: string, workspaceId: string): Promise<Task | undefined>;
-  list(filters: TaskFilters, workspaceId: string, page: TaskPage): Promise<TaskPageResult>;
+  list(
+    filters: TaskFilters,
+    workspaceId: string,
+    page: TaskPage,
+    sort: TaskSort,
+  ): Promise<TaskPageResult>;
   update(
     id: string,
     workspaceId: string,
@@ -84,12 +108,30 @@ export interface TaskRepository {
     expectedVersion: number,
     options?: MutationOptions,
   ): Promise<MutationResult>;
-  // Instantané complet du workspace (bootstrap / resynchronisation du client),
-  // non paginé : c'est un état de référence, pas une navigation.
+  restore(id: string, workspaceId: string, options?: MutationOptions): Promise<MutationResult>;
+  listDeleted(workspaceId: string): Promise<readonly Task[]>;
+  reorder(ids: readonly string[], workspaceId: string, options?: MutationOptions): Promise<readonly Task[]>;
+  emptyInbox(
+    projectId: string,
+    workspaceId: string,
+    options?: MutationOptions,
+  ): Promise<number>;
   snapshot(workspaceId: string): Promise<readonly Task[]>;
 }
 
 export const TASK_REPOSITORY = "TASK_REPOSITORY";
+
+const PRIORITY_RANK: Readonly<Record<TaskPriority, number>> = {
+  NONE: 0,
+  LOW: 1,
+  MEDIUM: 2,
+  HIGH: 3,
+  URGENT: 4,
+};
+
+export function priorityRank(priority: TaskPriority): number {
+  return PRIORITY_RANK[priority];
+}
 
 export function compareTasks(left: Task, right: Task): number {
   if (left.sortOrder !== right.sortOrder) {
@@ -101,13 +143,74 @@ export function compareTasks(left: Task, right: Task): number {
   return left.id < right.id ? -1 : 1;
 }
 
-// Comparaison stricte avec la clé du curseur, dans le même ordre que
-// `compareTasks` : (sortOrder, puis id pour départager deux clés égales).
-export function isAfterCursor(task: Task, cursor: TaskCursor): boolean {
-  if (task.sortOrder !== cursor.sortOrder) {
-    return task.sortOrder > cursor.sortOrder;
+export function compareBySort(sort: TaskSort): (left: Task, right: Task) => number {
+  switch (sort) {
+    case "DUE_DATE":
+      return (left, right) => {
+        if (left.dueDate !== right.dueDate) {
+          if (left.dueDate === undefined) return 1;
+          if (right.dueDate === undefined) return -1;
+          return left.dueDate < right.dueDate ? -1 : 1;
+        }
+        return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+      };
+    case "PRIORITY":
+      return (left, right) => {
+        const delta = priorityRank(right.priority) - priorityRank(left.priority);
+        if (delta !== 0) return delta;
+        return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+      };
+    case "CREATED_AT":
+      return (left, right) => {
+        if (left.createdAt !== right.createdAt) {
+          return left.createdAt > right.createdAt ? -1 : 1;
+        }
+        return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+      };
+    case "TITLE":
+      return (left, right) => {
+        const delta = left.title.localeCompare(right.title, "fr");
+        if (delta !== 0) return delta;
+        return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+      };
+    case "MANUAL":
+      return compareTasks;
   }
-  return task.id > cursor.id;
+}
+
+function sortValue(task: Task, sort: TaskSort): string | null {
+  switch (sort) {
+    case "DUE_DATE":
+      return task.dueDate ?? null;
+    case "PRIORITY":
+      return task.priority;
+    case "CREATED_AT":
+      return task.createdAt;
+    case "TITLE":
+      return task.title;
+    case "MANUAL":
+      return task.sortOrder;
+  }
+}
+
+export function cursorOf(task: Task, sort: TaskSort): TaskCursor {
+  return { sort, value: sortValue(task, sort), id: task.id };
+}
+
+// Comparaison à la clé du curseur, dans le même ordre que `compareBySort`.
+export function isAfterCursor(task: Task, cursor: TaskCursor): boolean {
+  const compare = compareBySort(cursor.sort);
+  const reference = {
+    ...task,
+    sortOrder: cursor.sort === "MANUAL" ? (cursor.value ?? task.sortOrder) : task.sortOrder,
+    dueDate: cursor.sort === "DUE_DATE" ? (cursor.value ?? undefined) : task.dueDate,
+    priority:
+      cursor.sort === "PRIORITY" ? ((cursor.value ?? task.priority) as TaskPriority) : task.priority,
+    createdAt: cursor.sort === "CREATED_AT" ? (cursor.value ?? task.createdAt) : task.createdAt,
+    title: cursor.sort === "TITLE" ? (cursor.value ?? task.title) : task.title,
+    id: cursor.id,
+  } as Task;
+  return compare(task, reference) > 0;
 }
 
 // Implémentation en mémoire : elle rend la feature testable sans PostgreSQL.
@@ -116,10 +219,6 @@ export class InMemoryTaskRepository implements TaskRepository {
   private readonly tasks = new Map<string, StoredTask>();
   private sequence = 0;
 
-  // Fabrique réservée aux tests : elle peuple une liste dont l'ordre est
-  // connu (insertion avant le curseur, clés de tri égales). Le constructeur
-  // doit rester sans paramètre, sinon Nest tente d'injecter `Array`
-  // (`design:paramtypes`) et refuse de démarrer l'application.
   static withTasks(seed: readonly StoredTask[]): InMemoryTaskRepository {
     const repository = new InMemoryTaskRepository();
     for (const task of seed) {
@@ -139,16 +238,22 @@ export class InMemoryTaskRepository implements TaskRepository {
       title: draft.title,
       priority: draft.priority,
       status: "TODO",
-      // Clé de tri croissante : une tâche créée se place toujours en fin de liste.
       sortOrder: `${this.sequence.toString(36).padStart(6, "0")}`,
       version: 0,
       completedAt: null,
       createdAt: now,
       updatedAt: now,
       tagIds: [...draft.tagIds],
+      reminders: [...draft.reminders],
+      recurrenceMode: draft.recurrenceMode,
       ...(draft.description === undefined ? {} : { description: draft.description }),
       ...(draft.projectId === undefined ? {} : { projectId: draft.projectId }),
+      ...(draft.parentId === undefined ? {} : { parentId: draft.parentId }),
       ...(draft.dueDate === undefined ? {} : { dueDate: draft.dueDate }),
+      ...(draft.dueTime === undefined ? {} : { dueTime: draft.dueTime }),
+      ...(draft.startDate === undefined ? {} : { startDate: draft.startDate }),
+      ...(draft.recurrenceRule === undefined ? {} : { recurrenceRule: draft.recurrenceRule }),
+      ...(draft.estimateMinutes === undefined ? {} : { estimateMinutes: draft.estimateMinutes }),
     };
 
     this.tasks.set(task.id, task);
@@ -157,9 +262,9 @@ export class InMemoryTaskRepository implements TaskRepository {
 
   async findById(id: string, workspaceId: string): Promise<Task | undefined> {
     const task = this.tasks.get(id);
-    // Scope par workspace systématique (N-3) : une tâche d'un autre workspace
-    // est indistinguable d'une tâche absente.
-    return task !== undefined && task.workspaceId === workspaceId ? toTask(task) : undefined;
+    return task !== undefined && task.workspaceId === workspaceId && task.deletedAt === undefined
+      ? toTask(task)
+      : undefined;
   }
 
   async update(
@@ -170,7 +275,7 @@ export class InMemoryTaskRepository implements TaskRepository {
     _options?: MutationOptions,
   ): Promise<MutationResult> {
     const existing = this.tasks.get(id);
-    if (existing === undefined || existing.workspaceId !== workspaceId) {
+    if (existing === undefined || existing.workspaceId !== workspaceId || existing.deletedAt !== undefined) {
       return { status: "not_found" };
     }
     if (existing.version !== expectedVersion) {
@@ -178,8 +283,6 @@ export class InMemoryTaskRepository implements TaskRepository {
     }
 
     const now = new Date().toISOString();
-    // Le passage à DONE horodate la complétion ; en sortir l'efface
-    // (doc 02, RF tâches). La règle vit ici car le repository détient l'entité.
     const completedAt =
       patch.status === undefined
         ? existing.completedAt
@@ -187,15 +290,18 @@ export class InMemoryTaskRepository implements TaskRepository {
           ? (existing.completedAt ?? now)
           : null;
 
-    // Chaque champ requis est réassigné explicitement : étaler un `TaskPatch`
-    // dont les clés sont optionnelles rendrait `next` non assignable à `Task`.
-    // Les champs optionnels sont ajoutés seulement quand ils ont une valeur
-    // (`exactOptionalPropertyTypes` interdit de les mettre à `undefined`).
-    const description = patch.description ?? existing.description;
-    // `null` est une valeur métier (retour à l'Inbox), pas une absence.
-    const projectId =
-      patch.projectId === undefined ? existing.projectId : (patch.projectId ?? undefined);
-    const dueDate = patch.dueDate ?? existing.dueDate;
+    // Les clés `null` effacent le champ ; `undefined` signifie « inchangé ».
+    const optional = <T>(value: T | null | undefined, previous: T | undefined): T | undefined =>
+      value === undefined ? previous : value === null ? undefined : value;
+
+    const description = optional(patch.description, existing.description);
+    const projectId = optional(patch.projectId, existing.projectId);
+    const parentId = optional(patch.parentId, existing.parentId);
+    const dueDate = optional(patch.dueDate, existing.dueDate);
+    const dueTime = optional(patch.dueTime, existing.dueTime);
+    const startDate = optional(patch.startDate, existing.startDate);
+    const recurrenceRule = optional(patch.recurrenceRule, existing.recurrenceRule);
+    const estimateMinutes = optional(patch.estimateMinutes, existing.estimateMinutes);
 
     const next: StoredTask = {
       id: existing.id,
@@ -209,9 +315,16 @@ export class InMemoryTaskRepository implements TaskRepository {
       createdAt: existing.createdAt,
       updatedAt: now,
       tagIds: patch.tagIds === undefined ? existing.tagIds : [...patch.tagIds],
+      reminders: patch.reminders === undefined ? existing.reminders : [...patch.reminders],
+      recurrenceMode: patch.recurrenceMode ?? existing.recurrenceMode,
       ...(description === undefined ? {} : { description }),
       ...(projectId === undefined ? {} : { projectId }),
+      ...(parentId === undefined ? {} : { parentId }),
       ...(dueDate === undefined ? {} : { dueDate }),
+      ...(dueTime === undefined ? {} : { dueTime }),
+      ...(startDate === undefined ? {} : { startDate }),
+      ...(recurrenceRule === undefined ? {} : { recurrenceRule }),
+      ...(estimateMinutes === undefined ? {} : { estimateMinutes }),
     };
 
     this.tasks.set(id, next);
@@ -225,34 +338,161 @@ export class InMemoryTaskRepository implements TaskRepository {
     _options?: MutationOptions,
   ): Promise<MutationResult> {
     const existing = this.tasks.get(id);
-    if (existing === undefined || existing.workspaceId !== workspaceId) {
+    if (existing === undefined || existing.workspaceId !== workspaceId || existing.deletedAt !== undefined) {
       return { status: "not_found" };
     }
     if (existing.version !== expectedVersion) {
       return { status: "conflict", currentVersion: existing.version };
     }
 
-    this.tasks.delete(id);
+    const now = new Date().toISOString();
+    this.tasks.set(id, { ...existing, version: existing.version + 1, deletedAt: now });
+    for (const [childId, child] of this.tasks) {
+      if (child.parentId === id && child.workspaceId === workspaceId && child.deletedAt === undefined) {
+        this.tasks.set(childId, { ...child, version: child.version + 1, deletedAt: now });
+      }
+    }
     return { status: "ok", task: toTask(existing) };
+  }
+
+  async restore(id: string, workspaceId: string, _options?: MutationOptions): Promise<MutationResult> {
+    const existing = this.tasks.get(id);
+    if (existing === undefined || existing.workspaceId !== workspaceId) {
+      return { status: "not_found" };
+    }
+    const now = new Date().toISOString();
+    const restored: StoredTask = {
+      ...existing,
+      version: existing.version + 1,
+      updatedAt: now,
+    };
+    delete (restored as { deletedAt?: string }).deletedAt;
+    this.tasks.set(id, restored);
+    // Un parent supprimé avait supprimé ses enfants : la restauration les
+    // remet ensemble pour ne pas laisser de sous-tâches orphelines.
+    for (const [childId, child] of this.tasks) {
+      if (child.parentId === id && child.workspaceId === workspaceId) {
+        const childRestored: StoredTask = { ...child, version: child.version + 1, updatedAt: now };
+        delete (childRestored as { deletedAt?: string }).deletedAt;
+        this.tasks.set(childId, childRestored);
+      }
+    }
+    return { status: "ok", task: toTask(restored) };
+  }
+
+  async listDeleted(workspaceId: string): Promise<readonly Task[]> {
+    return [...this.tasks.values()]
+      .filter((task) => task.workspaceId === workspaceId && task.deletedAt !== undefined)
+      .sort((left, right) => (left.deletedAt ?? "") < (right.deletedAt ?? "") ? 1 : -1)
+      .map(toTask);
+  }
+
+  async reorder(
+    ids: readonly string[],
+    workspaceId: string,
+    _options?: MutationOptions,
+  ): Promise<readonly Task[]> {
+    const now = new Date().toISOString();
+    const updated: Task[] = [];
+    ids.forEach((id, index) => {
+      const existing = this.tasks.get(id);
+      if (existing === undefined || existing.workspaceId !== workspaceId || existing.deletedAt !== undefined) {
+        return;
+      }
+      const next: StoredTask = {
+        ...existing,
+        sortOrder: `${(index + 1).toString(36).padStart(6, "0")}`,
+        version: existing.version + 1,
+        updatedAt: now,
+      };
+      this.tasks.set(id, next);
+      updated.push(toTask(next));
+    });
+    return updated;
+  }
+
+  async emptyInbox(
+    projectId: string,
+    workspaceId: string,
+    _options?: MutationOptions,
+  ): Promise<number> {
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const [id, task] of this.tasks) {
+      if (
+        task.workspaceId === workspaceId &&
+        task.deletedAt === undefined &&
+        task.projectId === undefined &&
+        task.parentId === undefined
+      ) {
+        this.tasks.set(id, { ...task, projectId, version: task.version + 1, updatedAt: now });
+        count += 1;
+      }
+    }
+    return count;
   }
 
   async snapshot(workspaceId: string): Promise<readonly Task[]> {
     return [...this.tasks.values()]
-      .filter((task) => task.workspaceId === workspaceId)
+      .filter((task) => task.workspaceId === workspaceId && task.deletedAt === undefined)
       .sort(compareTasks)
       .map(toTask);
   }
 
-  async list(filters: TaskFilters, workspaceId: string, page: TaskPage): Promise<TaskPageResult> {
+  async list(
+    filters: TaskFilters,
+    workspaceId: string,
+    page: TaskPage,
+    sort: TaskSort,
+  ): Promise<TaskPageResult> {
+    const today = new Date().toISOString().slice(0, 10);
+    const inSevenDays = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
     const matching = [...this.tasks.values()]
-      .filter((task) => task.workspaceId === workspaceId)
+      .filter((task) => task.workspaceId === workspaceId && task.deletedAt === undefined)
       .filter((task) => filters.status === undefined || task.status === filters.status)
+      .filter((task) => filters.priority === undefined || task.priority === filters.priority)
       .filter((task) => filters.projectId === undefined || task.projectId === filters.projectId)
-      .sort(compareTasks)
+      .filter((task) => filters.inbox !== true || task.projectId === undefined)
+      .filter((task) => filters.parentId === undefined || task.parentId === filters.parentId)
+      .filter(
+        (task) =>
+          filters.tagIds === undefined ||
+          filters.tagIds.every((tagId) => task.tagIds.includes(tagId)),
+      )
+      .filter(
+        (task) =>
+          filters.includeCompleted === true ||
+          filters.status !== undefined ||
+          (task.status !== "DONE" && task.status !== "CANCELLED"),
+      )
+      .filter((task) => {
+        if (filters.due === undefined) return true;
+        if (filters.due === "NONE") return task.dueDate === undefined;
+        if (task.dueDate === undefined) return false;
+        if (filters.due === "OVERDUE") return task.dueDate < today;
+        if (filters.due === "TODAY") return task.dueDate === today;
+        return task.dueDate >= today && task.dueDate <= inSevenDays;
+      })
+      .filter(
+        (task) =>
+          filters.q === undefined ||
+          `${task.title} ${task.description ?? ""}`
+            .toLocaleLowerCase("fr")
+            .normalize("NFD")
+            .replace(/\p{Diacritic}/gu, "")
+            .includes(
+              filters.q
+                .toLocaleLowerCase("fr")
+                .normalize("NFD")
+                .replace(/\p{Diacritic}/gu, ""),
+            ),
+      )
+      .sort(compareBySort(sort))
       .filter((task) => page.after === undefined || isAfterCursor(task, page.after));
 
-    // Un élément de plus que demandé : c'est ce qui révèle `hasMore` sans
-    // compter la collection entière.
     const window = matching.slice(0, page.limit + 1);
 
     return {

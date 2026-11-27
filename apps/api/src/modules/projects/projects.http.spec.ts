@@ -229,7 +229,7 @@ describe("projets", () => {
     expect(cleared.projectId).toBeUndefined();
   });
 
-  it("remet les tâches du projet supprimé dans l'Inbox", async () => {
+  it("place les tâches du projet supprimé dans la corbeille", async () => {
     const doomed = parseProject((await createProject({ name: "Projet supprimé" })).body);
     const kept = parseProject((await createProject({ name: "Projet conservé" })).body);
 
@@ -255,10 +255,17 @@ describe("projets", () => {
     });
     expect(removed.status).toBe(204);
 
-    const moved = taskSchema.parse((await request(`/api/v1/tasks/${inDoomed.id}`)).body);
-    expect(moved.projectId).toBeUndefined();
-    // La version avance : le client hors ligne reçoit un changement à rejouer.
-    expect(moved.version).toBe(inDoomed.version + 1);
+    // La tâche n'est plus lisible directement : elle est dans la corbeille avec
+    // son projet (RF-10/RF-29).
+    const gone = await request(`/api/v1/tasks/${inDoomed.id}`);
+    expect(gone.status).toBe(404);
+
+    const trash = (await request("/api/v1/tasks/trash")).body as {
+      tasks: readonly { id: string }[];
+      projects: readonly { id: string }[];
+    };
+    expect(trash.tasks.some((task) => task.id === inDoomed.id)).toBe(true);
+    expect(trash.projects.some((project) => project.id === doomed.id)).toBe(true);
 
     const untouched = taskSchema.parse((await request(`/api/v1/tasks/${inKept.id}`)).body);
     expect(untouched.projectId).toBe(kept.id);
@@ -269,6 +276,12 @@ describe("projets", () => {
       (await request(`/api/v1/tasks?projectId=${doomed.id}`)).body,
     );
     expect(page.items).toEqual([]);
+
+    // Restaurer le projet restaure aussi ses tâches.
+    const restored = await request(`/api/v1/projects/${doomed.id}/restore`, { method: "POST" });
+    expect(restored.status).toBe(200);
+    const resurrected = taskSchema.parse((await request(`/api/v1/tasks/${inDoomed.id}`)).body);
+    expect(resurrected.projectId).toBe(doomed.id);
   });
 
   it("valide les entrées", async () => {

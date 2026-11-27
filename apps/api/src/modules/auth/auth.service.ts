@@ -378,6 +378,7 @@ export class AuthService {
         weekStartsOn: true,
         timeFormat: true,
         theme: true,
+        quickAddParsingEnabled: true,
         memberships: {
           select: {
             role: true,
@@ -401,6 +402,7 @@ export class AuthService {
       weekStartsOn: user.weekStartsOn,
       timeFormat: user.timeFormat,
       theme: user.theme,
+      quickAddParsingEnabled: user.quickAddParsingEnabled,
       workspaces: user.memberships.map((membership) => ({
         id: membership.workspace.id,
         name: membership.workspace.name,
@@ -430,6 +432,9 @@ export class AuthService {
       ...(parsed.data.weekStartsOn === undefined ? {} : { weekStartsOn: parsed.data.weekStartsOn }),
       ...(parsed.data.timeFormat === undefined ? {} : { timeFormat: parsed.data.timeFormat }),
       ...(parsed.data.theme === undefined ? {} : { theme: parsed.data.theme }),
+      ...(parsed.data.quickAddParsingEnabled === undefined
+        ? {}
+        : { quickAddParsingEnabled: parsed.data.quickAddParsingEnabled }),
     };
     const updated = await this.prisma.user.updateMany({
       where: { id: auth.userId, deletedAt: null },

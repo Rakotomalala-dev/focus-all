@@ -199,11 +199,10 @@ export class PrismaProjectRepository implements ProjectRepository {
           : { status: "conflict", currentVersion: current.version };
       }
 
-      // Les tâches du projet supprimé reviennent dans l'Inbox, dans la même
-      // transaction que le tombstone : aucun client ne peut observer un projet
-      // supprimé dont les tâches pointent encore vers lui. Chaque tâche voit
-      // sa version avancée et son propre `SyncChange` écrit, sinon les clients
-      // hors ligne garderaient l'ancien rattachement.
+      // Les tâches du projet partent dans la corbeille avec lui (RF-10/RF-29),
+      // dans la même transaction que le tombstone. Chaque tâche voit sa version
+      // avancée et son `SyncChange` DELETE, sinon un client hors ligne garderait
+      // des tâches vivantes rattachées à un projet supprimé.
       const taskIds = (
         await tx.task.findMany({
           where: { workspaceId, projectId: id, deletedAt: null },
@@ -212,10 +211,11 @@ export class PrismaProjectRepository implements ProjectRepository {
       ).map((task) => task.id);
 
       if (taskIds.length > 0) {
+        const deletedAt = new Date();
         await tx.task.updateMany({
           where: { workspaceId, id: { in: taskIds }, deletedAt: null },
           data: {
-            projectId: null,
+            deletedAt,
             version: { increment: 1 },
             ...(actorId === undefined ? {} : { updatedBy: actorId }),
           },
@@ -228,9 +228,9 @@ export class PrismaProjectRepository implements ProjectRepository {
               workspaceId,
               entityType: "task",
               entityId: taskRow.id,
-              operation: "UPSERT",
+              operation: "DELETE",
               version: taskRow.version,
-              payload: toTaskPayload(toTask(taskRow)),
+              payload: { id: taskRow.id },
               ...(actorId === undefined ? {} : { actorId }),
             },
           });
@@ -247,6 +247,98 @@ export class PrismaProjectRepository implements ProjectRepository {
         actorId,
       });
       return { status: "ok", project: toProject(row) };
+    });
+  }
+
+  async listDeleted(workspaceId: string): Promise<readonly Project[]> {
+    const rows = await this.prisma.project.findMany({
+      where: { workspaceId, deletedAt: { not: null } },
+      orderBy: [{ deletedAt: "desc" }, { id: "desc" }],
+    });
+    return rows.map(toProject);
+  }
+
+  async restore(
+    id: string,
+    workspaceId: string,
+    actorId: string | undefined,
+  ): Promise<ProjectMutationResult> {
+    return this.transaction(async (tx) => {
+      const existing = await tx.project.findFirst({
+        where: { id, workspaceId, deletedAt: { not: null } },
+      });
+      if (existing === null) {
+        return { status: "not_found" };
+      }
+      const row = await tx.project.update({
+        where: { id },
+        data: {
+          deletedAt: null,
+          version: { increment: 1 },
+        },
+      });
+      await this.recordChange(tx, {
+        workspaceId,
+        entityId: id,
+        operation: "UPSERT",
+        version: row.version,
+        payload: toProjectPayload(toProject(row)),
+        actorId,
+      });
+
+      // Les tâches supprimées avec le projet reviennent ensemble.
+      const tasks = await tx.task.findMany({
+        where: { workspaceId, projectId: id, deletedAt: { not: null } },
+      });
+      for (const task of tasks) {
+        const restored = await tx.task.update({
+          where: { id: task.id },
+          data: { deletedAt: null, version: { increment: 1 } },
+        });
+        await tx.syncChange.create({
+          data: {
+            workspaceId,
+            entityType: "task",
+            entityId: restored.id,
+            operation: "UPSERT",
+            version: restored.version,
+            payload: toTaskPayload(toTask(restored)),
+            ...(actorId === undefined ? {} : { actorId }),
+          },
+        });
+      }
+      return { status: "ok", project: toProject(row) };
+    });
+  }
+
+  async reorder(
+    ids: readonly string[],
+    workspaceId: string,
+    actorId: string | undefined,
+  ): Promise<readonly Project[]> {
+    return this.transaction(async (tx) => {
+      const projects: Project[] = [];
+      for (const [index, id] of ids.entries()) {
+        const updated = await tx.project.updateMany({
+          where: { id, workspaceId, deletedAt: null },
+          data: { sortOrder: new Prisma.Decimal(index + 1), version: { increment: 1 } },
+        });
+        if (updated.count === 0) {
+          continue;
+        }
+        const row = await tx.project.findUniqueOrThrow({ where: { id } });
+        const project = toProject(row);
+        projects.push(project);
+        await this.recordChange(tx, {
+          workspaceId,
+          entityId: id,
+          operation: "UPSERT",
+          version: row.version,
+          payload: toProjectPayload(project),
+          actorId,
+        });
+      }
+      return projects;
     });
   }
 }

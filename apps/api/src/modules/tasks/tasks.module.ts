@@ -1,10 +1,13 @@
 import { Module } from "@nestjs/common";
+import { ProjectsModule } from "../projects/projects.module";
+import { TagsModule } from "../tags/tags.module";
 import { PrismaTaskRepository } from "./prisma-task.repository";
 import { TASK_REPOSITORY } from "./task.repository";
 import { TasksController } from "./tasks.controller";
 import { TasksService } from "./tasks.service";
 
 @Module({
+  imports: [ProjectsModule, TagsModule],
   controllers: [TasksController],
   providers: [
     TasksService,

@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import {
+  projectOrderSchema,
   projectDraftSchema,
   projectUpdateSchema,
   uuidSchema,
@@ -150,5 +151,24 @@ export class ProjectsService {
       await this.projects.remove(id, auth.workspaceId, expected.version, auth.userId),
       expected.source,
     );
+  }
+
+  async reorder(auth: AuthContext, rawBody: unknown): Promise<readonly Project[]> {
+    const parsed = projectOrderSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      throw new BadRequestException(describeIssues(parsed.error.issues));
+    }
+    return this.projects.reorder(parsed.data.ids, auth.workspaceId, auth.userId);
+  }
+
+  async restore(auth: AuthContext, rawId: string): Promise<Project> {
+    const result = await this.projects.restore(this.parseId(rawId), auth.workspaceId, auth.userId);
+    if (result.status === "not_found") {
+      throw new DomainError("project.not_found");
+    }
+    if (result.status !== "ok") {
+      throw new DomainError("project.name_taken");
+    }
+    return result.project;
   }
 }

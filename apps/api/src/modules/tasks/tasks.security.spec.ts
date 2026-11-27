@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { AuthContext } from "../auth/auth-context";
 import { DomainError } from "../../common/domain-error";
 import { InMemoryTaskRepository, type StoredTask } from "./task.repository";
+import type { ProjectRepository } from "../projects/project.repository";
+import type { TagRepository } from "../tags/tag.repository";
 import { TasksService } from "./tasks.service";
 
 // Tests de sécurité négatifs exigés par AGENTS §8 : une ressource d'un autre
@@ -35,6 +37,8 @@ function storedTask(id: string, workspaceId: string, sortOrder: string): StoredT
     createdAt: TIMESTAMP,
     updatedAt: TIMESTAMP,
     tagIds: [],
+    reminders: [],
+    recurrenceMode: "FIXED",
   };
 }
 
@@ -43,7 +47,10 @@ function setup(): { service: TasksService; repository: InMemoryTaskRepository } 
     storedTask(OWN_TASK_ID, AUTH.workspaceId, "000001"),
     storedTask(FOREIGN_TASK_ID, OTHER_WORKSPACE_ID, "000002"),
   ]);
-  return { service: new TasksService(repository), repository };
+  return {
+    service: new TasksService(repository, {} as TagRepository, {} as ProjectRepository),
+    repository,
+  };
 }
 
 describe("cloisonnement par workspace — repository", () => {
@@ -57,7 +64,7 @@ describe("cloisonnement par workspace — repository", () => {
   it("filtre la liste sur le workspace courant uniquement", async () => {
     const { repository } = setup();
 
-    const page = await repository.list({}, AUTH.workspaceId, { limit: 10 });
+    const page = await repository.list({}, AUTH.workspaceId, { limit: 10 }, "MANUAL");
 
     expect(page.items.map((task) => task.id)).toEqual([OWN_TASK_ID]);
   });

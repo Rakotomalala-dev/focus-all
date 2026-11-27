@@ -24,6 +24,18 @@ const COMPONENTS = {
   TaskDraft: contracts.taskDraftSchema,
   TaskUpdate: contracts.taskUpdateSchema,
   TaskListResponse: contracts.taskListResponseSchema,
+  TaskOrder: contracts.taskOrderSchema,
+  ProjectOrder: contracts.projectOrderSchema,
+  InboxEmpty: contracts.inboxEmptySchema,
+  TrashResponse: contracts.trashResponseSchema,
+  Project: contracts.projectSchema,
+  ProjectDraft: contracts.projectDraftSchema,
+  ProjectUpdate: contracts.projectUpdateSchema,
+  ProjectListResponse: contracts.projectListResponseSchema,
+  Tag: contracts.tagSchema,
+  TagDraft: contracts.tagDraftSchema,
+  TagUpdate: contracts.tagUpdateSchema,
+  TagListResponse: contracts.tagListResponseSchema,
   ProblemDetails: contracts.problemDetailsSchema,
   AuthTokens: contracts.authTokensSchema,
   RegisterInput: contracts.registerInputSchema,
@@ -436,6 +448,22 @@ function buildDocument() {
               schema: { type: "string", enum: [...contracts.TASK_STATUSES] },
             },
             { name: "projectId", in: "query", schema: UUID },
+            {
+              name: "priority",
+              in: "query",
+              schema: { type: "string", enum: [...contracts.TASK_PRIORITIES] },
+            },
+            { name: "sort", in: "query", schema: { type: "string", enum: [...contracts.TASK_SORTS] } },
+            {
+              name: "due",
+              in: "query",
+              schema: { type: "string", enum: [...contracts.DUE_FILTERS] },
+            },
+            { name: "tagIds", in: "query", description: "UUID séparés par des virgules (ET).", schema: { type: "string" } },
+            { name: "q", in: "query", description: "Recherche plein texte sans accents.", schema: { type: "string" } },
+            { name: "parentId", in: "query", schema: UUID },
+            { name: "inbox", in: "query", schema: { type: "boolean" } },
+            { name: "includeCompleted", in: "query", schema: { type: "boolean" } },
           ],
           responses: {
             200: {
@@ -462,6 +490,63 @@ function buildDocument() {
               content: { [JSON_CONTENT]: { schema: ref("Task") } },
             },
             400: problemResponse("Corps invalide"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/tasks/order": {
+        patch: {
+          summary: "Réordonner les tâches (ordre fractionnaire persistant)",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("TaskOrder") } },
+          },
+          responses: {
+            200: {
+              description: "Tâches dans leur nouvel ordre",
+              content: {
+                [JSON_CONTENT]: { schema: { type: "array", items: ref("Task") } },
+              },
+            },
+            400: problemResponse("Identifiants invalides ou tâches hors workspace"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/tasks/inbox/empty": {
+        post: {
+          summary: "Vider l'Inbox vers un projet",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("InboxEmpty") } },
+          },
+          responses: {
+            200: {
+              description: "Nombre de tâches déplacées",
+              content: {
+                [JSON_CONTENT]: {
+                  schema: {
+                    type: "object",
+                    required: ["moved"],
+                    properties: { moved: { type: "integer", minimum: 0 } },
+                  },
+                },
+              },
+            },
+            400: problemResponse("Projet invalide"),
+            401: UNAUTHORIZED,
+            409: problemResponse("Projet archivé"),
+          },
+        },
+      },
+      "/api/v1/tasks/trash": {
+        get: {
+          summary: "Lister la corbeille (tâches et projets, 30 jours)",
+          responses: {
+            200: {
+              description: "Éléments supprimés et restaurables",
+              content: { [JSON_CONTENT]: { schema: ref("TrashResponse") } },
+            },
             401: UNAUTHORIZED,
           },
         },
@@ -503,6 +588,219 @@ function buildDocument() {
             404: problemResponse("Tâche introuvable dans ce workspace"),
             409: problemResponse("Version obsolète fournie dans la query"),
             412: problemResponse("Version obsolète fournie via If-Match"),
+          },
+        },
+      },
+      "/api/v1/tasks/{id}/restore": {
+        post: {
+          summary: "Restaurer une tâche depuis la corbeille",
+          parameters: [ID_PARAMETER],
+          responses: {
+            200: taskResponse("Tâche restaurée avec ses sous-tâches"),
+            400: problemResponse("Identifiant invalide"),
+            401: UNAUTHORIZED,
+            404: problemResponse("Tâche introuvable dans la corbeille"),
+          },
+        },
+      },
+      "/api/v1/projects": {
+        get: {
+          summary: "Lister les projets du workspace courant",
+          responses: {
+            200: {
+              description: "Projets triés par ordre manuel",
+              content: { [JSON_CONTENT]: { schema: ref("ProjectListResponse") } },
+            },
+            401: UNAUTHORIZED,
+          },
+        },
+        post: {
+          summary: "Créer un projet",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("ProjectDraft") } },
+          },
+          responses: {
+            201: {
+              description: "Projet créé",
+              headers: {
+                Location: { description: "URL du projet créé", schema: { type: "string" } },
+                ETag: etagHeader,
+              },
+              content: { [JSON_CONTENT]: { schema: ref("Project") } },
+            },
+            400: problemResponse("Corps invalide"),
+            401: UNAUTHORIZED,
+            409: problemResponse("Limite de projets atteinte"),
+          },
+        },
+      },
+      "/api/v1/projects/order": {
+        patch: {
+          summary: "Réordonner les projets",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("ProjectOrder") } },
+          },
+          responses: {
+            200: {
+              description: "Projets dans leur nouvel ordre",
+              content: {
+                [JSON_CONTENT]: { schema: { type: "array", items: ref("Project") } },
+              },
+            },
+            400: problemResponse("Identifiants invalides ou projets hors workspace"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/projects/{id}": {
+        get: {
+          summary: "Lire un projet",
+          parameters: [ID_PARAMETER],
+          responses: {
+            200: {
+              description: "Projet demandé",
+              headers: { ETag: etagHeader },
+              content: { [JSON_CONTENT]: { schema: ref("Project") } },
+            },
+            401: UNAUTHORIZED,
+            404: problemResponse("Projet introuvable dans ce workspace"),
+          },
+        },
+        patch: {
+          summary: "Modifier, archiver ou désarchiver un projet",
+          parameters: [ID_PARAMETER, IF_MATCH_PARAMETER],
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("ProjectUpdate") } },
+          },
+          responses: {
+            200: {
+              description: "Projet mis à jour, `version` incrémentée",
+              headers: { ETag: etagHeader },
+              content: { [JSON_CONTENT]: { schema: ref("Project") } },
+            },
+            400: problemResponse("Corps invalide ou version absente"),
+            401: UNAUTHORIZED,
+            404: problemResponse("Projet introuvable"),
+            409: problemResponse("Version obsolète"),
+            412: problemResponse("Version obsolète via If-Match"),
+          },
+        },
+        delete: {
+          summary: "Supprimer un projet et ses tâches (corbeille)",
+          parameters: [ID_PARAMETER, IF_MATCH_PARAMETER],
+          responses: {
+            204: { description: "Projet supprimé, sans corps" },
+            400: problemResponse("Identifiant ou version attendue invalide"),
+            401: UNAUTHORIZED,
+            404: problemResponse("Projet introuvable"),
+            409: problemResponse("Version obsolète"),
+            412: problemResponse("Version obsolète via If-Match"),
+          },
+        },
+      },
+      "/api/v1/projects/{id}/restore": {
+        post: {
+          summary: "Restaurer un projet depuis la corbeille",
+          parameters: [ID_PARAMETER],
+          responses: {
+            200: {
+              description: "Projet restauré avec ses tâches",
+              headers: { ETag: etagHeader },
+              content: { [JSON_CONTENT]: { schema: ref("Project") } },
+            },
+            400: problemResponse("Identifiant invalide"),
+            401: UNAUTHORIZED,
+            404: problemResponse("Projet introuvable dans la corbeille"),
+          },
+        },
+      },
+      "/api/v1/tags": {
+        get: {
+          summary: "Lister les tags du workspace",
+          responses: {
+            200: {
+              description: "Tags triés par nom normalisé",
+              content: { [JSON_CONTENT]: { schema: ref("TagListResponse") } },
+            },
+            401: UNAUTHORIZED,
+          },
+        },
+        post: {
+          summary: "Créer un tag",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("TagDraft") } },
+          },
+          responses: {
+            201: {
+              description: "Tag créé",
+              content: { [JSON_CONTENT]: { schema: ref("Tag") } },
+            },
+            400: problemResponse("Corps invalide"),
+            401: UNAUTHORIZED,
+            409: problemResponse("Nom déjà utilisé ou limite atteinte"),
+          },
+        },
+      },
+      "/api/v1/tags/ensure": {
+        post: {
+          summary: "Créer les tags manquants et renvoyer les existants (saisie rapide)",
+          requestBody: {
+            required: true,
+            content: {
+              [JSON_CONTENT]: {
+                schema: {
+                  type: "object",
+                  required: ["names"],
+                  properties: {
+                    names: { type: "array", minItems: 1, maxItems: 20, items: { type: "string", minLength: 1, maxLength: 40 } },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: {
+              description: "Tags résolus",
+              content: {
+                [JSON_CONTENT]: { schema: { type: "array", items: ref("Tag") } },
+              },
+            },
+            400: problemResponse("Corps invalide"),
+            401: UNAUTHORIZED,
+            409: problemResponse("Limite de tags atteinte"),
+          },
+        },
+      },
+      "/api/v1/tags/{id}": {
+        patch: {
+          summary: "Renommer ou recolorer un tag",
+          parameters: [ID_PARAMETER],
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("TagUpdate") } },
+          },
+          responses: {
+            200: {
+              description: "Tag mis à jour",
+              content: { [JSON_CONTENT]: { schema: ref("Tag") } },
+            },
+            400: problemResponse("Corps invalide"),
+            401: UNAUTHORIZED,
+            404: problemResponse("Tag introuvable"),
+            409: problemResponse("Nom déjà utilisé"),
+          },
+        },
+        delete: {
+          summary: "Supprimer un tag et retirer ses références des tâches",
+          parameters: [ID_PARAMETER],
+          responses: {
+            204: { description: "Tag supprimé, sans corps" },
+            401: UNAUTHORIZED,
+            404: problemResponse("Tag introuvable"),
           },
         },
       },

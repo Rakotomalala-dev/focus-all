@@ -22,11 +22,20 @@ async function main() {
     const expiredSessions = await prisma.session.deleteMany({
       where: { expiresAt: { lt: cutoff } },
     });
+    // RF-29 : la corbeille est purgée après 30 jours. Les sous-tâches suivent
+    // leur parent par cascade ; les projets partent après leurs tâches.
+    const trashedTasks = await prisma.task.deleteMany({
+      where: { deletedAt: { not: null, lte: cutoff } },
+    });
+    const trashedProjects = await prisma.project.deleteMany({
+      where: { deletedAt: { not: null, lte: cutoff } },
+    });
 
     console.warn(
       `Purge terminée : ${deletedAccounts.count} compte(s), ` +
         `${expiredResetTokens.count} jeton(s) de réinitialisation, ` +
-        `${expiredSessions.count} session(s) expirée(s).`,
+        `${expiredSessions.count} session(s) expirée(s), ` +
+        `${trashedTasks.count} tâche(s) et ${trashedProjects.count} projet(s) purgé(s).`,
     );
   } finally {
     await prisma.$disconnect();

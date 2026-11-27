@@ -7,8 +7,18 @@ type DomainErrorParams = {
   readonly "task.not_found": undefined;
   readonly "task.version_mismatch": { readonly currentVersion: number };
   readonly "task.version_precondition_failed": { readonly currentVersion: number };
+  readonly "task.tag_not_found": undefined;
+  readonly "task.parent_invalid": undefined;
+  readonly "task.subtask_limit": undefined;
+  readonly "task.subtask_due_date": undefined;
+  readonly "task.project_archived": undefined;
+  readonly "task.recurrence_invalid": undefined;
   readonly "project.not_found": undefined;
   readonly "project.name_taken": undefined;
+  readonly "project.archived": undefined;
+  readonly "tag.not_found": undefined;
+  readonly "tag.name_taken": undefined;
+  readonly "tag.limit_reached": undefined;
   readonly "project.version_mismatch": { readonly currentVersion: number };
   readonly "project.version_precondition_failed": { readonly currentVersion: number };
   readonly "request.invalid_field": { readonly field: string };
@@ -41,8 +51,18 @@ const CATALOG: Readonly<
   "task.not_found": { code: "NOT_FOUND", status: 404 },
   "task.version_mismatch": { code: "CONFLICT_VERSION", status: 409 },
   "task.version_precondition_failed": { code: "CONFLICT_VERSION", status: 412 },
+  "task.tag_not_found": { code: "VALIDATION_FAILED", status: 400 },
+  "task.parent_invalid": { code: "VALIDATION_FAILED", status: 400 },
+  "task.subtask_limit": { code: "REQUEST_REJECTED", status: 409 },
+  "task.subtask_due_date": { code: "VALIDATION_FAILED", status: 400 },
+  "task.project_archived": { code: "REQUEST_REJECTED", status: 409 },
+  "task.recurrence_invalid": { code: "VALIDATION_FAILED", status: 400 },
   "project.not_found": { code: "NOT_FOUND", status: 404 },
   "project.name_taken": { code: "REQUEST_REJECTED", status: 409 },
+  "project.archived": { code: "REQUEST_REJECTED", status: 409 },
+  "tag.not_found": { code: "NOT_FOUND", status: 404 },
+  "tag.name_taken": { code: "REQUEST_REJECTED", status: 409 },
+  "tag.limit_reached": { code: "REQUEST_REJECTED", status: 409 },
   "project.version_mismatch": { code: "CONFLICT_VERSION", status: 409 },
   "project.version_precondition_failed": { code: "CONFLICT_VERSION", status: 412 },
   "request.invalid_field": { code: "VALIDATION_FAILED", status: 400 },

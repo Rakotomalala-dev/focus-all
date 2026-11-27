@@ -39,6 +39,17 @@ export interface ProjectRepository {
     expectedVersion: number,
     actorId: string | undefined,
   ): Promise<ProjectMutationResult>;
+  listDeleted(workspaceId: string): Promise<readonly Project[]>;
+  restore(
+    id: string,
+    workspaceId: string,
+    actorId: string | undefined,
+  ): Promise<ProjectMutationResult>;
+  reorder(
+    ids: readonly string[],
+    workspaceId: string,
+    actorId: string | undefined,
+  ): Promise<readonly Project[]>;
 }
 
 export const PROJECT_REPOSITORY = "PROJECT_REPOSITORY";

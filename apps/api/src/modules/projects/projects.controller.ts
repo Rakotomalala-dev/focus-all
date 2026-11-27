@@ -55,6 +55,13 @@ export class ProjectsController {
     return project;
   }
 
+  // Déclaré avant `:id` pour que `order` ne soit pas interprété comme un UUID.
+  @Patch("order")
+  @HttpCode(200)
+  reorder(@CurrentAuth() auth: AuthContext, @Body() body: unknown): Promise<readonly Project[]> {
+    return this.projects.reorder(auth, body);
+  }
+
   @Patch(":id")
   async update(
     @CurrentAuth() auth: AuthContext,
@@ -66,6 +73,12 @@ export class ProjectsController {
     const project = await this.projects.update(auth, id, body, ifMatch);
     publishVersion(reply, project);
     return project;
+  }
+
+  @Post(":id/restore")
+  @HttpCode(200)
+  restore(@CurrentAuth() auth: AuthContext, @Param("id") id: string): Promise<Project> {
+    return this.projects.restore(auth, id);
   }
 
   @Delete(":id")
