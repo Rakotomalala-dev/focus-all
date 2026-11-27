@@ -8,10 +8,11 @@ export type TaskCardProps = {
   readonly task: Task;
   readonly onToggle: (task: Task) => void;
   readonly onOpen?: (task: Task) => void;
+  readonly onLongPress?: (task: Task) => void;
   readonly isPending: boolean;
 };
 
-export function TaskCard({ task, onToggle, onOpen, isPending }: TaskCardProps) {
+export function TaskCard({ task, onToggle, onOpen, onLongPress, isPending }: TaskCardProps) {
   const theme = useFocusTheme();
   const { t, i18n } = useTranslation();
   const isDone = task.status === "DONE";
@@ -65,6 +66,7 @@ export function TaskCard({ task, onToggle, onOpen, isPending }: TaskCardProps) {
         accessibilityRole={onOpen === undefined ? undefined : "button"}
         accessibilityLabel={onOpen === undefined ? undefined : t("tasks.card.open", { title: task.title })}
         onPress={onOpen === undefined ? undefined : () => onOpen(task)}
+        onLongPress={onLongPress === undefined ? undefined : () => onLongPress(task)}
         style={{ flex: 1, gap: theme.spacing.xs, minHeight: 44, justifyContent: "center" }}
       >
         <AppText

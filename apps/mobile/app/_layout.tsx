@@ -31,6 +31,8 @@ export default function RootLayout() {
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="reset-password" options={{ headerShown: false }} />
           <Stack.Screen name="settings" options={{ title: t("settings.title") }} />
+          <Stack.Screen name="trash" options={{ title: t("trash.title") }} />
+          <Stack.Screen name="tags" options={{ title: t("tags.title") }} />
           <Stack.Screen name="tasks/[id]" options={{ title: t("tasks.detail.title") }} />
           <Stack.Screen name="projects/index" options={{ title: t("projects.title") }} />
           <Stack.Screen name="projects/[id]" options={{ title: t("projects.detail.title") }} />

@@ -9,6 +9,8 @@ const TASK: Task = {
   title: "Appeler le comptable",
   priority: "HIGH",
   tagIds: [],
+  reminders: [],
+  recurrenceMode: "FIXED",
   status: "TODO",
   completedAt: null,
   sortOrder: "a0",

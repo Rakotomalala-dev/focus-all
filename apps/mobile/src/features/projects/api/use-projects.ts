@@ -42,3 +42,23 @@ export function useDeleteProject() {
     },
   });
 }
+
+export function useReorderProjects() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: readonly string[]) => projectRepository.reorder(ids),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: PROJECT_LIST_KEY });
+    },
+  });
+}
+
+export function useRestoreProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => projectRepository.restore(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: PROJECT_LIST_KEY });
+    },
+  });
+}

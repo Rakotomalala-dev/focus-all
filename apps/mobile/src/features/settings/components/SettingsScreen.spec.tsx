@@ -28,6 +28,7 @@ vi.mock("../../auth/api/use-auth", () => ({
       weekStartsOn: "MONDAY",
       timeFormat: "H24",
       theme: "SYSTEM",
+      quickAddParsingEnabled: true,
       workspaces: [],
     },
   }),

@@ -56,6 +56,10 @@
     "signedOut": "Sign in to manage your account.",
     "title": "Settings",
     "avatarLabel": "{{name}}'s avatar",
+    "toggle": {
+      "on": "On",
+      "off": "Off"
+    },
     "fields": {
       "displayName": "Display name",
       "avatarUrl": "Avatar URL",
@@ -64,6 +68,7 @@
       "language": "Language",
       "weekStart": "Week starts on",
       "timeFormat": "Time format",
+      "quickAddParsing": "Quick add parsing",
       "theme": "Theme",
       "currentPassword": "Current password",
       "newPassword": "New password",
@@ -124,12 +129,41 @@
       "delete": "Permanently delete my account"
     }
   },
+  "trash": {
+    "title": "Trash",
+    "hint": "Deleted items are kept for 30 days, then purged.",
+    "empty": "Trash is empty.",
+    "tasks": "Deleted tasks",
+    "projects": "Deleted projects",
+    "restore": "Restore",
+    "error": "Trash could not be loaded"
+  },
+  "tags": {
+    "title": "Tags",
+    "hint": "Tags are shared across the workspace and usable in quick add with #name.",
+    "new": "New tag",
+    "create": "Create",
+    "empty": "No tags yet.",
+    "edit": "Rename tag {{name}}",
+    "editAction": "Rename",
+    "save": "Save",
+    "delete": "Delete tag {{name}}",
+    "deleteAction": "Delete",
+    "confirmDelete": "Confirm deletion of tag {{name}}",
+    "confirmAction": "Confirm",
+    "error": "Tags could not be loaded"
+  },
   "projects": {
     "title": "Projects",
     "loading": "Loading projects…",
     "active": "Active",
     "archived": "Archived",
     "open": "Open project “{{name}}”",
+    "reorder": {
+      "toggle": "Reorder",
+      "up": "Move project “{{name}}” up",
+      "down": "Move project “{{name}}” down"
+    },
     "error": {
       "title": "Projects could not be loaded",
       "retry": "Try again"
@@ -222,6 +256,45 @@
       "URGENT": "Urgent priority"
     },
     "dueDate": "Due: {{date}}",
+    "quick": {
+      "due": "Due: {{date}}",
+      "priority": "Priority: {{priority}}",
+      "tag": "Tag: #{{name}}",
+      "project": "Project: {{name}}",
+      "recurrence": "Recurring task"
+    },
+    "filters": {
+      "search": "Search tasks…",
+      "all": "All statuses",
+      "includeCompleted": "Include completed",
+      "clear": "Reset",
+      "inbox": "Inbox",
+      "due": {
+        "OVERDUE": "Overdue",
+        "TODAY": "Today",
+        "NEXT_7_DAYS": "Next 7 days",
+        "NONE": "No date"
+      }
+    },
+    "sort": {
+      "MANUAL": "Manual",
+      "DUE_DATE": "Due date",
+      "PRIORITY": "Priority",
+      "CREATED_AT": "Created",
+      "TITLE": "Alphabetical"
+    },
+    "reorder": {
+      "toggle": "Reorder",
+      "up": "Move “{{title}}” up",
+      "down": "Move “{{title}}” down"
+    },
+    "trash": {
+      "open": "Trash"
+    },
+    "inbox": {
+      "emptyHint": "Move all Inbox tasks to:",
+      "empty": "Empty Inbox"
+    },
     "detail": {
       "title": "Edit task",
       "cancel": "Cancel",
@@ -230,18 +303,56 @@
       "fields": {
         "title": "Title",
         "description": "Description",
+        "status": "Status",
         "priority": "Priority",
         "dueDate": "Due date",
-        "project": "Project"
+        "dueTime": "Time",
+        "startDate": "Start",
+        "project": "Project",
+        "estimate": "Estimate (minutes)",
+        "tags": "Tags",
+        "reminders": "Reminders"
       },
       "inbox": "Inbox",
+      "richTextHint": "Limited Markdown: **bold**, *italic*, - lists, - [ ] checkboxes, [link](url).",
+      "newTag": "New tag",
+      "addTag": "Add tag",
+      "removeReminder": "Remove",
+      "reminderDate": "Reminder date",
+      "reminderTime": "Reminder time",
+      "addReminder": "Add reminder",
+      "recurrenceInterval": "Every N periods",
+      "recurrenceRule": "RFC 5545 RRULE",
+      "subtasks": {
+        "title": "Subtasks",
+        "add": "New subtask",
+        "submit": "Add",
+        "suggestDone": "All subtasks are done: complete the parent task?"
+      },
+      "delete": "Delete task",
+      "confirmDelete": "Confirm deletion",
       "errors": {
         "title": "A title is required.",
-        "dueDate": "Use the YYYY-MM-DD format."
+        "dueDate": "Use the YYYY-MM-DD format.",
+        "startDate": "Use the YYYY-MM-DD format.",
+        "time": "Use the HH:MM format."
       },
       "notFound": {
         "title": "Task not found",
         "body": "It may have been deleted on another device."
+      }
+    },
+    "recurrence": {
+      "presets": {
+        "NONE": "None",
+        "DAILY": "Daily",
+        "WEEKLY": "Weekly",
+        "MONTHLY": "Monthly",
+        "YEARLY": "Yearly"
+      },
+      "modes": {
+        "FIXED": "Fixed date",
+        "AFTER_COMPLETION": "After completion"
       }
     }
   },

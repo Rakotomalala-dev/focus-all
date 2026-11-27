@@ -35,6 +35,18 @@ vi.mock("../api/use-tasks", () => ({
     mutate: mocks.setMutation,
     isPending: false,
   }),
+  useReorderTasks: () => ({ mutate: vi.fn(), isPending: false }),
+  useEmptyInbox: () => ({ mutate: vi.fn(), isPending: false }),
+  useEnsureTags: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
+vi.mock("../../tags/api/use-tags", () => ({
+  useTags: () => ({ status: "success", data: [] }),
+  useEnsureTags: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
+vi.mock("../../projects/api/use-projects", () => ({
+  useProjects: () => ({ status: "success", data: [] }),
 }));
 
 const TASK: Task = {
@@ -42,6 +54,8 @@ const TASK: Task = {
   title: "Appeler le comptable",
   priority: "HIGH",
   tagIds: [],
+  reminders: [],
+  recurrenceMode: "FIXED",
   status: "TODO",
   completedAt: null,
   sortOrder: "a0",

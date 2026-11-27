@@ -9,7 +9,7 @@ import { toAppError } from "./app-error";
 // une erreur typée au lieu d'un objet à moitié valide dans l'UI (ADR-009).
 export type ResponseSchema<T> = { readonly parse: (data: unknown) => T };
 
-export type HttpQuery = Readonly<Record<string, string | number>>;
+export type HttpQuery = Readonly<Record<string, string | number | boolean>>;
 
 export type HttpClient = {
   readonly get: <T>(path: string, schema: ResponseSchema<T>, query?: HttpQuery) => Promise<T>;

@@ -8,6 +8,8 @@ import { Pressable, TextInput, View } from "react-native";
 export type TaskComposerProps = {
   readonly onCreate: (input: string) => Promise<void>;
   readonly isSubmitting: boolean;
+  readonly onTextChange?: (text: string) => void;
+  readonly preview?: readonly string[];
 };
 
 type ComposerForm = {
@@ -16,7 +18,7 @@ type ComposerForm = {
 
 type ValidationKey = "tasks.composer.missingTitle" | "tasks.composer.titleTooLong";
 
-export function TaskComposer({ onCreate, isSubmitting }: TaskComposerProps) {
+export function TaskComposer({ onCreate, isSubmitting, onTextChange, preview }: TaskComposerProps) {
   const theme = useFocusTheme();
   const { t } = useTranslation();
   const [validationKey, setValidationKey] = useState<ValidationKey | null>(null);
@@ -56,7 +58,10 @@ export function TaskComposer({ onCreate, isSubmitting }: TaskComposerProps) {
               placeholder={t("tasks.composer.placeholder")}
               placeholderTextColor={theme.colors.text.muted}
               value={value}
-              onChangeText={onChange}
+              onChangeText={(text) => {
+                onChange(text);
+                onTextChange?.(text);
+              }}
               onBlur={onBlur}
               editable={!isSubmitting}
               maxLength={MAX_TASK_TITLE_LENGTH}
@@ -99,6 +104,16 @@ export function TaskComposer({ onCreate, isSubmitting }: TaskComposerProps) {
           </AppText>
         </Pressable>
       </View>
+
+      {preview === undefined || preview.length === 0 ? null : (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.xs }}>
+          {preview.map((line) => (
+            <AppText key={line} tone="muted">
+              {line}
+            </AppText>
+          ))}
+        </View>
+      )}
 
       {validationKey === null ? null : (
         <AppText

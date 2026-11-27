@@ -8,6 +8,8 @@ const TASK: Task = {
   title: "Acheter du pain",
   priority: "NONE",
   tagIds: [],
+  reminders: [],
+  recurrenceMode: "FIXED",
   status: "TODO",
   completedAt: null,
   sortOrder: "a0",
@@ -59,19 +61,26 @@ describe("taskRepository", () => {
 
     const page = await createTaskRepository(client).list();
 
-    expect(calls).toEqual([{ method: "get", path: TASKS_PATH, query: { limit: 50 } }]);
+    expect(calls).toEqual([
+      { method: "get", path: TASKS_PATH, query: { limit: 50, sort: "MANUAL" } },
+    ]);
     expect(page.items).toHaveLength(1);
   });
 
   it("transmet le curseur et les filtres sans paramètre vide", async () => {
     const { client, calls } = createRecordingClient({ items: [], nextCursor: null });
 
-    await createTaskRepository(client).list({ limit: 10, cursor: "abc", status: "TODO" });
+    await createTaskRepository(client).list({
+      limit: 10,
+      sort: "DUE_DATE",
+      cursor: "abc",
+      status: "TODO",
+    });
 
     expect(calls[0]).toEqual({
       method: "get",
       path: TASKS_PATH,
-      query: { limit: 10, cursor: "abc", status: "TODO" },
+      query: { limit: 10, sort: "DUE_DATE", cursor: "abc", status: "TODO" },
     });
   });
 
@@ -83,7 +92,13 @@ describe("taskRepository", () => {
     expect(calls[0]).toEqual({
       method: "post",
       path: TASKS_PATH,
-      body: { title: "Acheter du pain", priority: "NONE", tagIds: [] },
+      body: {
+        title: "Acheter du pain",
+        priority: "NONE",
+        tagIds: [],
+        reminders: [],
+        recurrenceMode: "FIXED",
+      },
     });
     expect(created.id).toBe(TASK.id);
   });

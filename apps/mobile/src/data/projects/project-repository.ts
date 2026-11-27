@@ -18,6 +18,8 @@ export type ProjectRepository = {
   readonly create: (draft: ProjectDraftInput) => Promise<Project>;
   readonly update: (project: Project, patch: ProjectPatchInput) => Promise<Project>;
   readonly remove: (project: Project) => Promise<void>;
+  readonly reorder: (ids: readonly string[]) => Promise<readonly Project[]>;
+  readonly restore: (id: string) => Promise<Project>;
 };
 
 // 204 sans corps : le schéma vide évite un second chemin non validé.
@@ -42,5 +44,17 @@ export function createProjectRepository(http: HttpClient): ProjectRepository {
 
     remove: (project) =>
       http.delete(`${PROJECTS_PATH}/${project.id}`, NO_CONTENT, { version: project.version }),
+
+    reorder: (ids) =>
+      http.patch(`${PROJECTS_PATH}/order`, { ids }, {
+        parse: (value: unknown) => {
+          if (!Array.isArray(value)) {
+            throw new Error("Réponse de réordonnancement invalide");
+          }
+          return value.map((item) => projectSchema.parse(item));
+        },
+      }),
+
+    restore: (id) => http.post(`${PROJECTS_PATH}/${id}/restore`, undefined, projectSchema),
   };
 }

@@ -23,6 +23,7 @@ vi.mock("../api/use-projects", () => ({
     ...mocks.createResult,
     mutateAsync: mocks.createMutateAsync,
   }),
+  useReorderProjects: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const PROJECT: Project = {

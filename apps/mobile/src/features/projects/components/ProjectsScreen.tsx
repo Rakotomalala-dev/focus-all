@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, FlatList, Pressable, TextInput, View } from "react-native";
 import { appErrorMessageKey } from "../../../data/http/app-error";
-import { useCreateProject, useProjects } from "../api/use-projects";
+import { useCreateProject, useProjects, useReorderProjects } from "../api/use-projects";
 
 // RF-10 : liste, création et accès au détail. Les quatre états sont explicites ;
 // la création reste en haut de l'écran pour ne pas cacher la liste.
@@ -15,8 +15,21 @@ export function ProjectsScreen() {
   const router = useRouter();
   const projectsQuery = useProjects();
   const createProject = useCreateProject();
+  const reorderProjects = useReorderProjects();
   const [name, setName] = useState("");
   const [isNameInvalid, setIsNameInvalid] = useState(false);
+  const [reorderMode, setReorderMode] = useState(false);
+
+  function move(index: number, direction: -1 | 1): void {
+    const items = projectsQuery.data ?? [];
+    const target = index + direction;
+    if (target < 0 || target >= items.length) return;
+    const ids = items.map((item) => item.id);
+    const [moved] = ids.splice(index, 1);
+    if (moved === undefined) return;
+    ids.splice(target, 0, moved);
+    reorderProjects.mutate(ids);
+  }
 
   async function handleCreate(): Promise<void> {
     if (!projectNameSchema.safeParse(name).success) {
@@ -87,26 +100,50 @@ export function ProjectsScreen() {
         data={projectsQuery.data}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
-        renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("projects.open", { name: item.name })}
-            onPress={() => {
-              router.push({ pathname: "/projects/[id]", params: { id: item.id } });
-            }}
-            style={{
-              minHeight: 44,
-              paddingVertical: theme.spacing.md,
-              borderBottomWidth: theme.border.width,
-              borderBottomColor: theme.colors.border,
-              gap: theme.spacing.xs,
-            }}
-          >
-            <AppText>{item.name}</AppText>
-            <AppText tone="muted">
-              {item.archivedAt === null ? t("projects.active") : t("projects.archived")}
-            </AppText>
-          </Pressable>
+        renderItem={({ item, index }) => (
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("projects.open", { name: item.name })}
+              onPress={() => {
+                router.push({ pathname: "/projects/[id]", params: { id: item.id } });
+              }}
+              onLongPress={() => setReorderMode(true)}
+              style={{
+                flex: 1,
+                minHeight: 44,
+                paddingVertical: theme.spacing.md,
+                borderBottomWidth: theme.border.width,
+                borderBottomColor: theme.colors.border,
+                gap: theme.spacing.xs,
+              }}
+            >
+              <AppText>{item.name}</AppText>
+              <AppText tone="muted">
+                {item.archivedAt === null ? t("projects.active") : t("projects.archived")}
+              </AppText>
+            </Pressable>
+            {reorderMode ? (
+              <View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("projects.reorder.up", { name: item.name })}
+                  onPress={() => move(index, -1)}
+                  style={{ minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center" }}
+                >
+                  <AppText>↑</AppText>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("projects.reorder.down", { name: item.name })}
+                  onPress={() => move(index, 1)}
+                  style={{ minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center" }}
+                >
+                  <AppText>↓</AppText>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
         )}
       />
     );
@@ -116,6 +153,16 @@ export function ProjectsScreen() {
     <Screen>
       <View style={{ flex: 1, gap: theme.spacing.lg }}>
         <AppText tone="display">{t("projects.title")}</AppText>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: reorderMode }}
+          accessibilityLabel={t("projects.reorder.toggle")}
+          onPress={() => setReorderMode((value) => !value)}
+          style={{ minHeight: 44, justifyContent: "center" }}
+        >
+          <AppText tone="muted">{t("projects.reorder.toggle")}</AppText>
+        </Pressable>
 
         <View style={{ gap: theme.spacing.xs }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: theme.spacing.sm }}>

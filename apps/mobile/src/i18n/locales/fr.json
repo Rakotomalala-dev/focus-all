@@ -56,6 +56,10 @@
     "signedOut": "Connectez-vous pour gérer votre compte.",
     "title": "Réglages",
     "avatarLabel": "Avatar de {{name}}",
+    "toggle": {
+      "on": "Activé",
+      "off": "Désactivé"
+    },
     "fields": {
       "displayName": "Nom affiché",
       "avatarUrl": "URL de l'avatar",
@@ -64,6 +68,7 @@
       "language": "Langue",
       "weekStart": "Début de semaine",
       "timeFormat": "Format d'heure",
+      "quickAddParsing": "Analyse de la saisie rapide",
       "theme": "Thème",
       "currentPassword": "Mot de passe actuel",
       "newPassword": "Nouveau mot de passe",
@@ -124,12 +129,41 @@
       "delete": "Supprimer définitivement mon compte"
     }
   },
+  "trash": {
+    "title": "Corbeille",
+    "hint": "Les éléments supprimés sont conservés 30 jours, puis purgés.",
+    "empty": "La corbeille est vide.",
+    "tasks": "Tâches supprimées",
+    "projects": "Projets supprimés",
+    "restore": "Restaurer",
+    "error": "Impossible de charger la corbeille"
+  },
+  "tags": {
+    "title": "Tags",
+    "hint": "Les tags sont partagés par tout le workspace et utilisables dans la saisie rapide avec #nom.",
+    "new": "Nouveau tag",
+    "create": "Créer",
+    "empty": "Aucun tag pour l'instant.",
+    "edit": "Renommer le tag {{name}}",
+    "editAction": "Renommer",
+    "save": "Enregistrer",
+    "delete": "Supprimer le tag {{name}}",
+    "deleteAction": "Supprimer",
+    "confirmDelete": "Confirmer la suppression du tag {{name}}",
+    "confirmAction": "Confirmer",
+    "error": "Impossible de charger les tags"
+  },
   "projects": {
     "title": "Projets",
     "loading": "Chargement des projets…",
     "active": "Actif",
     "archived": "Archivé",
     "open": "Ouvrir le projet « {{name}} »",
+    "reorder": {
+      "toggle": "Réorganiser",
+      "up": "Monter le projet « {{name}} »",
+      "down": "Descendre le projet « {{name}} »"
+    },
     "error": {
       "title": "Impossible de charger les projets",
       "retry": "Réessayer"
@@ -221,6 +255,45 @@
       "HIGH": "Priorité haute",
       "URGENT": "Priorité urgente"
     },
+    "quick": {
+      "due": "Échéance : {{date}}",
+      "priority": "Priorité : {{priority}}",
+      "tag": "Tag : #{{name}}",
+      "project": "Projet : {{name}}",
+      "recurrence": "Tâche récurrente"
+    },
+    "filters": {
+      "search": "Rechercher une tâche…",
+      "all": "Tous les statuts",
+      "includeCompleted": "Terminées incluses",
+      "clear": "Réinitialiser",
+      "inbox": "Inbox",
+      "due": {
+        "OVERDUE": "En retard",
+        "TODAY": "Aujourd'hui",
+        "NEXT_7_DAYS": "7 jours",
+        "NONE": "Sans date"
+      }
+    },
+    "sort": {
+      "MANUAL": "Manuel",
+      "DUE_DATE": "Échéance",
+      "PRIORITY": "Priorité",
+      "CREATED_AT": "Création",
+      "TITLE": "Alphabétique"
+    },
+    "reorder": {
+      "toggle": "Réorganiser",
+      "up": "Monter « {{title}} »",
+      "down": "Descendre « {{title}} »"
+    },
+    "trash": {
+      "open": "Corbeille"
+    },
+    "inbox": {
+      "emptyHint": "Déplacer toutes les tâches de l'Inbox vers :",
+      "empty": "Vider l'Inbox"
+    },
     "dueDate": "Échéance : {{date}}",
     "detail": {
       "title": "Modifier la tâche",
@@ -230,18 +303,56 @@
       "fields": {
         "title": "Titre",
         "description": "Description",
+        "status": "Statut",
         "priority": "Priorité",
         "dueDate": "Échéance",
-        "project": "Projet"
+        "dueTime": "Heure",
+        "startDate": "Début",
+        "project": "Projet",
+        "estimate": "Estimation (minutes)",
+        "tags": "Tags",
+        "reminders": "Rappels"
       },
       "inbox": "Inbox",
+      "richTextHint": "Markdown limité : **gras**, *italique*, - listes, - [ ] cases, [lien](url).",
+      "newTag": "Nouveau tag",
+      "addTag": "Ajouter le tag",
+      "removeReminder": "Retirer",
+      "reminderDate": "Date du rappel",
+      "reminderTime": "Heure du rappel",
+      "addReminder": "Ajouter le rappel",
+      "recurrenceInterval": "Toutes les N périodes",
+      "recurrenceRule": "RRULE RFC 5545",
+      "subtasks": {
+        "title": "Sous-tâches",
+        "add": "Nouvelle sous-tâche",
+        "submit": "Ajouter",
+        "suggestDone": "Toutes les sous-tâches sont faites : terminer la tâche parente ?"
+      },
+      "delete": "Supprimer la tâche",
+      "confirmDelete": "Confirmer la suppression",
       "errors": {
         "title": "Le titre est obligatoire.",
-        "dueDate": "Utilisez le format AAAA-MM-JJ."
+        "dueDate": "Utilisez le format AAAA-MM-JJ.",
+        "startDate": "Utilisez le format AAAA-MM-JJ.",
+        "time": "Utilisez le format HH:MM."
       },
       "notFound": {
         "title": "Tâche introuvable",
         "body": "Elle a peut-être été supprimée sur un autre appareil."
+      }
+    },
+    "recurrence": {
+      "presets": {
+        "NONE": "Aucune",
+        "DAILY": "Quotidienne",
+        "WEEKLY": "Hebdomadaire",
+        "MONTHLY": "Mensuelle",
+        "YEARLY": "Annuelle"
+      },
+      "modes": {
+        "FIXED": "Date fixe",
+        "AFTER_COMPLETION": "Après complétion"
       }
     }
   },

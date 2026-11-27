@@ -143,7 +143,8 @@ export function SettingsScreen() {
       | { theme: ThemePreference }
       | { locale: "fr" | "en" }
       | { weekStartsOn: WeekStart }
-      | { timeFormat: TimeFormat },
+      | { timeFormat: TimeFormat }
+      | { quickAddParsingEnabled: boolean },
   ): void {
     update.mutate(input);
   }
@@ -243,6 +244,17 @@ export function SettingsScreen() {
         </Section>
 
         <Section title={t("settings.preferences.title")}>
+          <Choice
+            label={t("settings.fields.quickAddParsing")}
+            value={user.quickAddParsingEnabled ? "ON" : "OFF"}
+            options={[
+              { value: "ON" as const, label: t("settings.toggle.on") },
+              { value: "OFF" as const, label: t("settings.toggle.off") },
+            ]}
+            onChange={(value) => {
+              savePreference({ quickAddParsingEnabled: value === "ON" });
+            }}
+          />
           <Choice
             label={t("settings.fields.language")}
             value={user.locale}

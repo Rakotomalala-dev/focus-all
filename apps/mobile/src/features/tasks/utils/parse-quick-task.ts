@@ -1,13 +1,15 @@
 import type { TaskPriority } from "@focus/contracts";
 
-// RF-20 : saisie rapide d'un titre, analyse légère de la syntaxe naturelle.
-// Seuls la priorité et l'échéance sont extraites : le contrat `TaskDraft`
-// attend `tagIds` (UUID) et un titre de projet, pas un nom — `#tag` et `@projet`
-// restent donc dans le titre au lieu d'être perdus silencieusement.
+// RF-20 : analyse légère de la syntaxe naturelle. En cas d'ambiguïté, le texte
+// reste dans le titre : rien n'est perdu silencieusement.
 export type QuickTask = {
   readonly title: string;
   readonly priority: TaskPriority;
   readonly dueDate?: string;
+  readonly dueTime?: string;
+  readonly tagNames: readonly string[];
+  readonly projectName?: string;
+  readonly recurrenceRule?: string;
 };
 
 export type QuickTaskOptions = {
@@ -32,8 +34,11 @@ const WEEKDAYS: Readonly<Record<string, number>> = {
   samedi: 6,
 };
 
+const RRULE_WEEKDAYS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
+
 const PRIORITY_TOKEN = /^!(urgent|haute|moyenne|basse|aucune)$/i;
 const SHORT_DATE_TOKEN = /^(\d{1,2})\/(\d{1,2})$/;
+const TIME_TOKEN = /^(\d{1,2})(?:h|:)(\d{2})?$/i;
 
 function toIsoDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -45,7 +50,6 @@ function addDays(date: Date, days: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 
-// Dates civiles : tout est calculé à minuit local, jamais via UTC (ADR-017).
 function parseDueDate(token: string, today: Date): string | undefined {
   const word = token.toLowerCase();
 
@@ -58,7 +62,6 @@ function parseDueDate(token: string, today: Date): string | undefined {
 
   const weekday = WEEKDAYS[word];
   if (weekday !== undefined) {
-    // Un jour déjà passé dans la semaine désigne le suivant, pas aujourd'hui.
     const delta = (weekday - today.getDay() + 7) % 7;
     return toIsoDate(addDays(today, delta === 0 ? 7 : delta));
   }
@@ -75,7 +78,6 @@ function parseDueDate(token: string, today: Date): string | undefined {
   const day = Number(dayText);
   const month = Number(monthText);
   let date = new Date(today.getFullYear(), month - 1, day);
-  // Une date inexistante (31/02) n'est pas interprétée : le texte reste intact.
   if (date.getMonth() !== month - 1 || date.getDate() !== day) {
     return undefined;
   }
@@ -85,12 +87,49 @@ function parseDueDate(token: string, today: Date): string | undefined {
   return toIsoDate(date);
 }
 
+function parseTime(token: string): string | undefined {
+  const match = TIME_TOKEN.exec(token);
+  if (match === null) return undefined;
+  const hour = Number(match[1]);
+  const minutes = match[2] === undefined ? 0 : Number(match[2]);
+  if (hour > 23 || minutes > 59) return undefined;
+  return `${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function recurrenceFor(token: string, dueDate: string | undefined, today: Date): string | undefined {
+  const value = token.slice(1).toLowerCase();
+  const base = dueDate === undefined ? today : new Date(`${dueDate}T00:00:00`);
+  const day = RRULE_WEEKDAYS[base.getDay()] ?? "MO";
+
+  if (value === "daily" || value === "quotidien" || value === "quotidienne") {
+    return "RRULE:FREQ=DAILY";
+  }
+  if (value === "weekly" || value === "hebdo" || value === "hebdomadaire") {
+    return `RRULE:FREQ=WEEKLY;BYDAY=${day}`;
+  }
+  if (value === "monthly" || value === "mensuel" || value === "mensuelle") {
+    return `RRULE:FREQ=MONTHLY;BYMONTHDAY=${base.getDate()}`;
+  }
+  if (value === "yearly" || value === "annuel" || value === "annuelle") {
+    return "RRULE:FREQ=YEARLY";
+  }
+  const weekday = WEEKDAYS[value];
+  if (weekday !== undefined) {
+    return `RRULE:FREQ=WEEKLY;BYDAY=${RRULE_WEEKDAYS[weekday]}`;
+  }
+  return undefined;
+}
+
 export function parseQuickTask(input: string, options: QuickTaskOptions): QuickTask {
   const today = new Date(options.now.getFullYear(), options.now.getMonth(), options.now.getDate());
   const tokens = input.trim().split(/\s+/);
   const titleTokens: string[] = [];
+  const tagNames: string[] = [];
+  let projectName: string | undefined;
+  let recurrenceRule: string | undefined;
   let priority: TaskPriority = "NONE";
   let dueDate: string | undefined;
+  let dueTime: string | undefined;
 
   for (const token of tokens) {
     if (PRIORITY_TOKEN.test(token)) {
@@ -101,18 +140,50 @@ export function parseQuickTask(input: string, options: QuickTaskOptions): QuickT
       }
     }
 
+    if (token.startsWith("#") && token.length > 1) {
+      tagNames.push(token.slice(1));
+      continue;
+    }
+
+    if (token.startsWith("@") && token.length > 1) {
+      projectName = token.slice(1);
+      continue;
+    }
+
+    if (token.startsWith("*") && token.length > 1) {
+      const rule = recurrenceFor(token, dueDate, today);
+      if (rule !== undefined) {
+        recurrenceRule = rule;
+        continue;
+      }
+    }
+
     const parsedDueDate = parseDueDate(token, today);
     if (parsedDueDate !== undefined) {
       dueDate = parsedDueDate;
       continue;
     }
 
+    if (dueDate !== undefined) {
+      const parsedTime = parseTime(token);
+      if (parsedTime !== undefined) {
+        dueTime = parsedTime;
+        continue;
+      }
+    }
+
     titleTokens.push(token);
   }
 
-  // Tout le texte a été interprété (ex. « demain » seul) : le titre reprend la
-  // saisie d'origine, jamais une chaîne vide.
   const title = titleTokens.length > 0 ? titleTokens.join(" ") : input.trim();
 
-  return dueDate === undefined ? { title, priority } : { title, priority, dueDate };
+  return {
+    title,
+    priority,
+    tagNames,
+    ...(dueDate === undefined ? {} : { dueDate }),
+    ...(dueTime === undefined ? {} : { dueTime }),
+    ...(projectName === undefined ? {} : { projectName }),
+    ...(recurrenceRule === undefined ? {} : { recurrenceRule }),
+  };
 }
