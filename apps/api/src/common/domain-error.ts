@@ -13,6 +13,9 @@ type DomainErrorParams = {
   readonly "task.subtask_due_date": undefined;
   readonly "task.project_archived": undefined;
   readonly "task.recurrence_invalid": undefined;
+  readonly "task.reminder_limit": { readonly max: number };
+  readonly "task.reminder_requires_due_date": undefined;
+  readonly "notification.device_not_found": undefined;
   readonly "project.not_found": undefined;
   readonly "project.name_taken": undefined;
   readonly "project.archived": undefined;
@@ -57,6 +60,9 @@ const CATALOG: Readonly<
   "task.subtask_due_date": { code: "VALIDATION_FAILED", status: 400 },
   "task.project_archived": { code: "REQUEST_REJECTED", status: 409 },
   "task.recurrence_invalid": { code: "VALIDATION_FAILED", status: 400 },
+  "task.reminder_limit": { code: "VALIDATION_FAILED", status: 400 },
+  "task.reminder_requires_due_date": { code: "VALIDATION_FAILED", status: 400 },
+  "notification.device_not_found": { code: "NOT_FOUND", status: 404 },
   "project.not_found": { code: "NOT_FOUND", status: 404 },
   "project.name_taken": { code: "REQUEST_REJECTED", status: 409 },
   "project.archived": { code: "REQUEST_REJECTED", status: 409 },

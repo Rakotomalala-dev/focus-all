@@ -43,7 +43,9 @@ type FilterState = {
   readonly status?: TaskStatus | undefined;
   readonly priority?: TaskPriority | undefined;
   readonly due?: DueFilter | undefined;
-  readonly tagId?: string | undefined;
+  // RF-35 : plusieurs tags se combinent en ET, comme le filtre serveur.
+  // Tableau mutable : `TaskListQuery.tagIds` est un `string[]`.
+  readonly tagIds: string[];
   readonly projectId?: string | undefined;
   readonly inbox?: boolean | undefined;
 };
@@ -57,7 +59,7 @@ export function TasksScreen() {
   const projectsQuery = useProjects();
   const tagsQuery = useTags();
   const ensureTags = useEnsureTags();
-  const [filters, setFilters] = useState<FilterState>({ q: "" });
+  const [filters, setFilters] = useState<FilterState>({ q: "", tagIds: [] });
   const [sort, setSort] = useState<TaskSort>("MANUAL");
   const [includeCompleted, setIncludeCompleted] = useState(false);
   const [composerText, setComposerText] = useState("");
@@ -73,7 +75,7 @@ export function TasksScreen() {
       ...(filters.status === undefined ? {} : { status: filters.status }),
       ...(filters.priority === undefined ? {} : { priority: filters.priority }),
       ...(filters.due === undefined ? {} : { due: filters.due }),
-      ...(filters.tagId === undefined ? {} : { tagIds: [filters.tagId] }),
+      ...(filters.tagIds.length === 0 ? {} : { tagIds: filters.tagIds }),
       ...(filters.projectId === undefined ? {} : { projectId: filters.projectId }),
       ...(filters.inbox === undefined ? {} : { inbox: filters.inbox }),
     }),
@@ -160,7 +162,7 @@ export function TasksScreen() {
   }
 
   function clearFilters(): void {
-    setFilters({ q: "" });
+    setFilters({ q: "", tagIds: [] });
     setIncludeCompleted(false);
     setSort("MANUAL");
   }
@@ -278,6 +280,27 @@ export function TasksScreen() {
             onPress={() => logout.mutate()}
           />
         </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ flexDirection: "row", gap: theme.spacing.xs }}>
+            <HeaderButton
+              label={t("views.nav.today")}
+              onPress={() => router.push("/views/today")}
+            />
+            <HeaderButton
+              label={t("views.nav.upcoming")}
+              onPress={() => router.push("/views/upcoming")}
+            />
+            <HeaderButton
+              label={t("views.nav.calendar")}
+              onPress={() => router.push("/views/calendar")}
+            />
+            <HeaderButton
+              label={t("views.nav.kanban")}
+              onPress={() => router.push("/views/kanban")}
+            />
+          </View>
+        </ScrollView>
 
         <TaskComposer
           onCreate={handleCreate}
@@ -421,11 +444,13 @@ export function TasksScreen() {
                 <Chip
                   key={tag.id}
                   label={`#${tag.name}`}
-                  selected={filters.tagId === tag.id}
+                  selected={filters.tagIds.includes(tag.id)}
                   onPress={() =>
                     setFilters((current) => ({
                       ...current,
-                      ...(current.tagId === tag.id ? { tagId: undefined } : { tagId: tag.id }),
+                      tagIds: current.tagIds.includes(tag.id)
+                        ? current.tagIds.filter((id) => id !== tag.id)
+                        : [...current.tagIds, tag.id],
                     }))
                   }
                 />

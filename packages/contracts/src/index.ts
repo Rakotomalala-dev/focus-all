@@ -2,8 +2,10 @@
 // `@focus/contracts/src/...` n'est autorisé depuis les applications.
 export * from "./auth";
 export * from "./error-codes";
+export * from "./notifications";
 export * from "./problem-details";
 export * from "./project";
 export * from "./sync";
 export * from "./tag";
 export * from "./task";
+export * from "./views";

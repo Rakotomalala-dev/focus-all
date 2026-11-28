@@ -15,14 +15,17 @@ import { uuidV7 } from "../../common/uuid-v7";
 export type StoredTask = Task & {
   readonly workspaceId: string;
   readonly deletedAt?: string;
+  // RF-34 : position de carte, interne au serveur comme `workspaceId`.
+  readonly boardOrder?: string;
 };
 
 // Retire le scope avant de rendre l'entité : la seule sortie autorisée est
 // `Task`, donc l'oubli devient une erreur de compilation, pas une fuite.
 function toTask(stored: StoredTask): Task {
-  const { workspaceId, deletedAt, ...task } = stored;
+  const { workspaceId, deletedAt, boardOrder, ...task } = stored;
   void workspaceId;
   void deletedAt;
+  void boardOrder;
   return task;
 }
 
@@ -69,10 +72,18 @@ export type TaskPatch = {
   readonly priority?: TaskPriority;
   readonly tagIds?: readonly string[];
   readonly reminders?: readonly string[];
+  readonly reminderOffsets?: readonly number[];
   readonly recurrenceRule?: string | null;
   readonly recurrenceMode?: "FIXED" | "AFTER_COMPLETION";
   readonly estimateMinutes?: number | null;
   readonly status?: TaskStatus;
+  readonly pinned?: boolean;
+};
+
+export type BoardPosition = {
+  // `null` = fin de colonne.
+  readonly afterId?: string | null;
+  readonly beforeId?: string | null;
 };
 
 export type MutationResult =
@@ -109,6 +120,15 @@ export interface TaskRepository {
     options?: MutationOptions,
   ): Promise<MutationResult>;
   restore(id: string, workspaceId: string, options?: MutationOptions): Promise<MutationResult>;
+  // RF-34 : changement de statut + position de carte dans la colonne du projet.
+  moveOnBoard(
+    id: string,
+    workspaceId: string,
+    expectedVersion: number,
+    status: TaskStatus,
+    position: BoardPosition,
+    options?: MutationOptions,
+  ): Promise<MutationResult>;
   listDeleted(workspaceId: string): Promise<readonly Task[]>;
   reorder(ids: readonly string[], workspaceId: string, options?: MutationOptions): Promise<readonly Task[]>;
   emptyInbox(
@@ -238,6 +258,7 @@ export class InMemoryTaskRepository implements TaskRepository {
       title: draft.title,
       priority: draft.priority,
       status: "TODO",
+      pinned: false,
       sortOrder: `${this.sequence.toString(36).padStart(6, "0")}`,
       version: 0,
       completedAt: null,
@@ -245,6 +266,7 @@ export class InMemoryTaskRepository implements TaskRepository {
       updatedAt: now,
       tagIds: [...draft.tagIds],
       reminders: [...draft.reminders],
+      reminderOffsets: [...draft.reminderOffsets],
       recurrenceMode: draft.recurrenceMode,
       ...(draft.description === undefined ? {} : { description: draft.description }),
       ...(draft.projectId === undefined ? {} : { projectId: draft.projectId }),
@@ -309,6 +331,7 @@ export class InMemoryTaskRepository implements TaskRepository {
       title: patch.title ?? existing.title,
       priority: patch.priority ?? existing.priority,
       status: patch.status ?? existing.status,
+      pinned: patch.pinned ?? existing.pinned,
       sortOrder: existing.sortOrder,
       version: existing.version + 1,
       completedAt,
@@ -316,6 +339,10 @@ export class InMemoryTaskRepository implements TaskRepository {
       updatedAt: now,
       tagIds: patch.tagIds === undefined ? existing.tagIds : [...patch.tagIds],
       reminders: patch.reminders === undefined ? existing.reminders : [...patch.reminders],
+      reminderOffsets:
+        patch.reminderOffsets === undefined
+          ? existing.reminderOffsets
+          : [...patch.reminderOffsets],
       recurrenceMode: patch.recurrenceMode ?? existing.recurrenceMode,
       ...(description === undefined ? {} : { description }),
       ...(projectId === undefined ? {} : { projectId }),
@@ -325,8 +352,73 @@ export class InMemoryTaskRepository implements TaskRepository {
       ...(startDate === undefined ? {} : { startDate }),
       ...(recurrenceRule === undefined ? {} : { recurrenceRule }),
       ...(estimateMinutes === undefined ? {} : { estimateMinutes }),
+      ...(existing.boardOrder === undefined ? {} : { boardOrder: existing.boardOrder }),
     };
 
+    this.tasks.set(id, next);
+    return { status: "ok", task: toTask(next) };
+  }
+
+  // RF-34 : l'implémentation en mémoire place la carte entre ses voisines par
+  // sa clé `boardOrder` (chaîne décimale, comme PostgreSQL).
+  async moveOnBoard(
+    id: string,
+    workspaceId: string,
+    expectedVersion: number,
+    status: TaskStatus,
+    position: BoardPosition,
+    _options?: MutationOptions,
+  ): Promise<MutationResult> {
+    const existing = this.tasks.get(id);
+    if (existing === undefined || existing.workspaceId !== workspaceId || existing.deletedAt !== undefined) {
+      return { status: "not_found" };
+    }
+    if (existing.version !== expectedVersion) {
+      return { status: "conflict", currentVersion: existing.version };
+    }
+
+    const anchor = (neighborId: string | null | undefined): number | undefined => {
+      if (neighborId === null || neighborId === undefined) return undefined;
+      const neighbor = this.tasks.get(neighborId);
+      if (neighbor === undefined || neighbor.workspaceId !== workspaceId) return undefined;
+      return Number(neighbor.boardOrder ?? neighbor.sortOrder);
+    };
+    const after = anchor(position.afterId);
+    const before = anchor(position.beforeId);
+
+    let boardOrder: number;
+    if (after !== undefined && before !== undefined) {
+      boardOrder = (after + before) / 2;
+    } else if (after !== undefined) {
+      boardOrder = after + 1;
+    } else if (before !== undefined) {
+      boardOrder = before - 1;
+    } else {
+      const column = [...this.tasks.values()].filter(
+        (task) =>
+          task.workspaceId === workspaceId &&
+          task.deletedAt === undefined &&
+          task.projectId === existing.projectId &&
+          task.status === status,
+      );
+      boardOrder =
+        column.reduce(
+          (max, task) => Math.max(max, Number(task.boardOrder ?? task.sortOrder)),
+          0,
+        ) + 1;
+    }
+
+    const now = new Date().toISOString();
+    const completedAt =
+      status === "DONE" ? (existing.completedAt ?? now) : null;
+    const next: StoredTask = {
+      ...existing,
+      status,
+      completedAt,
+      boardOrder: boardOrder.toString(),
+      version: existing.version + 1,
+      updatedAt: now,
+    };
     this.tasks.set(id, next);
     return { status: "ok", task: toTask(next) };
   }

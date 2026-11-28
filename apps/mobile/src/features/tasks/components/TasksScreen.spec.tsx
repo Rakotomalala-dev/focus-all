@@ -58,6 +58,7 @@ const TASK: Task = {
   recurrenceMode: "FIXED",
   status: "TODO",
   completedAt: null,
+  pinned: false,
   sortOrder: "a0",
   version: 1,
   createdAt: "2026-11-25T09:00:00Z",

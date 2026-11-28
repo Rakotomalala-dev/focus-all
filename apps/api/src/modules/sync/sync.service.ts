@@ -14,6 +14,7 @@ import { describeIssues } from "../../common/zod-issues";
 import { PrismaService } from "../../database/prisma.service";
 import type { AuthContext } from "../auth/auth-context";
 import { toTaskPatch } from "../tasks/task-patch";
+import { RemindersService } from "../reminders/reminders.service";
 import { TASK_REPOSITORY, type MutationResult, type TaskRepository } from "../tasks/task.repository";
 
 // Le push est volontairement « un item = une transaction » (doc 01 §11.2) :
@@ -24,6 +25,7 @@ export class SyncService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(TASK_REPOSITORY) private readonly tasks: TaskRepository,
+    @Inject(RemindersService) private readonly reminders: RemindersService,
   ) {}
 
   private async currentCursor(workspaceId: string): Promise<number> {
@@ -130,6 +132,10 @@ export class SyncService {
         ...options,
         id: mutation.entityId,
       });
+      await this.reminders.scheduleTask(created, {
+        userId: auth.userId,
+        workspaceId: auth.workspaceId,
+      });
       return {
         clientMutationId: mutation.clientMutationId,
         status: "applied",
@@ -150,7 +156,11 @@ export class SyncService {
         mutation.baseVersion,
         options,
       );
-      return this.toResult(mutation, auth.workspaceId, removed, true);
+      const deleteResult = await this.toResult(mutation, auth.workspaceId, removed, true);
+      if (deleteResult.status === "applied") {
+        await this.reminders.cancelTask(mutation.entityId);
+      }
+      return deleteResult;
     }
 
     const parsed = taskUpdateSchema.safeParse(mutation.payload);
@@ -170,7 +180,19 @@ export class SyncService {
       mutation.baseVersion,
       options,
     );
-    return this.toResult(mutation, auth.workspaceId, updated, false);
+    const updateResult = await this.toResult(mutation, auth.workspaceId, updated, false);
+    if (updateResult.status === "applied" && updateResult.server !== null) {
+      const task = updateResult.server;
+      if (task.status === "DONE" || task.status === "CANCELLED") {
+        await this.reminders.cancelTask(task.id);
+      } else {
+        await this.reminders.scheduleTask(task, {
+          userId: auth.userId,
+          workspaceId: auth.workspaceId,
+        });
+      }
+    }
+    return updateResult;
   }
 
   async push(auth: AuthContext, rawBody: unknown): Promise<SyncPushResponse> {

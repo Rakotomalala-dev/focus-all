@@ -129,6 +129,34 @@
       "delete": "Permanently delete my account"
     }
   },
+  "offline": {
+    "title": "Offline data",
+    "hint": "Your recent tasks, projects and tags stay available without a network.",
+    "neverSynced": "never",
+    "banner": {
+      "online": "Online · Last sync: {{date}}",
+      "offline": "Offline · Last sync: {{date}}",
+      "syncing": "Syncing…",
+      "syncError": "Sync failed · Last sync: {{date}}"
+    },
+    "status": {
+      "loading": "Reading the local copy…",
+      "error": "The local copy could not be read.",
+      "retry": "Try again",
+      "empty": "No local data yet. Connect to the internet to download a copy.",
+      "counts": "{{tasks}} task(s), {{projects}} project(s), {{tags}} tag(s) cached.",
+      "lastSync": "Last sync: {{date}}",
+      "corrupted": "{{count}} unreadable entry(ies) in the local copy."
+    },
+    "reset": {
+      "hint": "Clears the local copy, then downloads a full snapshot. Pending mutations are kept when possible.",
+      "action": "Reset local data",
+      "confirm": "Confirm reset",
+      "cancel": "Cancel",
+      "done": "Local data reset and snapshot reloaded.",
+      "error": "Reset is not possible right now."
+    }
+  },
   "trash": {
     "title": "Trash",
     "hint": "Deleted items are kept for 30 days, then purged.",
@@ -353,6 +381,110 @@
       "modes": {
         "FIXED": "Fixed date",
         "AFTER_COMPLETION": "After completion"
+      }
+    }
+  },
+  "views": {
+    "nav": {
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "calendar": "Calendar",
+      "kanban": "Kanban"
+    },
+    "error": {
+      "retry": "Try again"
+    },
+    "subtasks": "Subtasks: {{done}}/{{total}}",
+    "today": {
+      "title": "Today",
+      "loading": "Loading your day…",
+      "load_one": "Load: {{duration}} · {{count}} task",
+      "load_other": "Load: {{duration}} · {{count}} tasks",
+      "sectionMeta_one": "{{count}} task · {{duration}}",
+      "sectionMeta_other": "{{count}} tasks · {{duration}}",
+      "sections": {
+        "OVERDUE": "Overdue",
+        "TODAY": "Today",
+        "IN_PROGRESS": "In progress",
+        "PINNED": "Pinned",
+        "COMPLETED": "Completed"
+      },
+      "collapse": "Collapse the {{section}} section",
+      "expand": "Expand the {{section}} section",
+      "pin": "Pin “{{title}}”",
+      "unpin": "Unpin “{{title}}”",
+      "pinError": "The pin could not be saved.",
+      "empty": {
+        "title": "Nothing for today",
+        "body": "Enjoy the quiet, or add a task from My tasks."
+      },
+      "error": {
+        "title": "Today could not be loaded"
+      }
+    },
+    "upcoming": {
+      "title": "Upcoming",
+      "hint": "Seven rolling days, with the estimated load of each one.",
+      "loading": "Loading the next seven days…",
+      "dayMeta_one": "{{count}} task · {{duration}}",
+      "dayMeta_other": "{{count}} tasks · {{duration}}",
+      "overload": "Busy day",
+      "noTasks": "Nothing planned.",
+      "empty": {
+        "title": "Clear week",
+        "body": "No task is due in the next seven days."
+      },
+      "error": {
+        "title": "Upcoming could not be loaded"
+      }
+    },
+    "calendar": {
+      "title": "Calendar",
+      "previous": "Previous period",
+      "next": "Next period",
+      "today": "Today",
+      "modes": {
+        "MONTH": "Month",
+        "WEEK": "Week"
+      },
+      "periodLoad_one": "{{count}} task · {{duration}}",
+      "periodLoad_other": "{{count}} tasks · {{duration}}",
+      "dayLabel": "{{date}}: {{count}} task(s)",
+      "dot_one": "{{count}}",
+      "dot_other": "{{count}}",
+      "dayMeta_one": "{{count}} task · {{duration}}",
+      "dayMeta_other": "{{count}} tasks · {{duration}}",
+      "emptyDay": "No task on that day.",
+      "emptyPeriod": "No task in this period.",
+      "open": "Open “{{title}}”",
+      "loading": "Loading the calendar…",
+      "error": {
+        "title": "Calendar could not be loaded"
+      }
+    },
+    "kanban": {
+      "title": "Kanban",
+      "hint": "Pick a project to show its board.",
+      "project": "Project {{name}}",
+      "open": "Open “{{title}}”",
+      "tags_one": "{{count}} tag",
+      "tags_other": "{{count}} tags",
+      "subtasks": "{{done}}/{{total}} subtasks",
+      "moveTo": "Move “{{title}}” to {{status}}",
+      "columnCount_one": "{{count}} card",
+      "columnCount_other": "{{count}} cards",
+      "loading": "Loading the board…",
+      "moveError": "The move could not be saved.",
+      "emptyProject": {
+        "title": "No projects",
+        "body": "Create a project to use the Kanban board."
+      },
+      "empty": {
+        "title": "Empty board",
+        "body": "Add a task to this project to get started."
+      },
+      "error": {
+        "title": "The board could not be loaded"
       }
     }
   },

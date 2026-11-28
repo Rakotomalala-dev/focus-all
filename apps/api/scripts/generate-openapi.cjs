@@ -25,6 +25,16 @@ const COMPONENTS = {
   TaskUpdate: contracts.taskUpdateSchema,
   TaskListResponse: contracts.taskListResponseSchema,
   TaskOrder: contracts.taskOrderSchema,
+  ViewCard: contracts.viewCardSchema,
+  TodaySection: contracts.todaySectionSchema,
+  TodayView: contracts.todayViewSchema,
+  UpcomingDay: contracts.upcomingDaySchema,
+  UpcomingView: contracts.upcomingViewSchema,
+  CalendarDay: contracts.calendarDaySchema,
+  CalendarView: contracts.calendarViewSchema,
+  KanbanColumn: contracts.kanbanColumnSchema,
+  KanbanView: contracts.kanbanViewSchema,
+  KanbanMove: contracts.kanbanMoveSchema,
   ProjectOrder: contracts.projectOrderSchema,
   InboxEmpty: contracts.inboxEmptySchema,
   TrashResponse: contracts.trashResponseSchema,
@@ -491,6 +501,113 @@ function buildDocument() {
             },
             400: problemResponse("Corps invalide"),
             401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/views/today": {
+        get: {
+          summary: "Agrégat Aujourd'hui : retards, jour, en cours, épinglées, accomplies",
+          parameters: [
+            {
+              name: "date",
+              in: "query",
+              description: "Jour de référence (défaut : jour courant UTC).",
+              schema: { type: "string", format: "date" },
+            },
+          ],
+          responses: {
+            200: {
+              description:
+                "Sections non vides, dans l'ordre En retard, Aujourd'hui, En cours, Épinglées, Accomplies ; « Accomplies » repliée par défaut.",
+              content: { [JSON_CONTENT]: { schema: ref("TodayView") } },
+            },
+            400: problemResponse("Date invalide"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/views/upcoming": {
+        get: {
+          summary: "Agrégat Prochain : sept jours glissants avec charge et surcharge",
+          parameters: [
+            {
+              name: "date",
+              in: "query",
+              description: "Premier jour de la fenêtre (défaut : jour courant UTC).",
+              schema: { type: "string", format: "date" },
+            },
+          ],
+          responses: {
+            200: {
+              description:
+                "Sept jours, chacun avec son nombre de tâches, son estimation totale et `overloaded` (> 8 h ou > 12 tâches).",
+              content: { [JSON_CONTENT]: { schema: ref("UpcomingView") } },
+            },
+            400: problemResponse("Date invalide"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/views/calendar": {
+        get: {
+          summary: "Calendrier mensuel ou hebdomadaire, occurrences récurrentes incluses",
+          parameters: [
+            {
+              name: "mode",
+              in: "query",
+              schema: { type: "string", enum: [...contracts.CALENDAR_MODES], default: "MONTH" },
+            },
+            {
+              name: "anchor",
+              in: "query",
+              description: "N'importe quelle date du mois ou de la semaine affichée.",
+              schema: { type: "string", format: "date" },
+            },
+          ],
+          responses: {
+            200: {
+              description:
+                "Jours de la période ; les occurrences récurrentes futures sont calculées et jamais persistées.",
+              content: { [JSON_CONTENT]: { schema: ref("CalendarView") } },
+            },
+            400: problemResponse("Mode ou date invalide"),
+            401: UNAUTHORIZED,
+          },
+        },
+      },
+      "/api/v1/views/kanban": {
+        get: {
+          summary: "Tableau Kanban d'un projet (TODO, IN_PROGRESS, DONE)",
+          parameters: [
+            { name: "projectId", in: "query", required: true, schema: UUID },
+          ],
+          responses: {
+            200: {
+              description: "Trois colonnes ordonnées par position de carte",
+              content: { [JSON_CONTENT]: { schema: ref("KanbanView") } },
+            },
+            400: problemResponse("Projet absent ou invalide"),
+            401: UNAUTHORIZED,
+            404: problemResponse("Projet introuvable dans ce workspace"),
+          },
+        },
+      },
+      "/api/v1/views/kanban/move": {
+        post: {
+          summary: "Déplacer une carte : statut et position dans la colonne",
+          requestBody: {
+            required: true,
+            content: { [JSON_CONTENT]: { schema: ref("KanbanMove") } },
+          },
+          responses: {
+            200: {
+              description: "Tâche mise à jour ; `completedAt` renseigné à l'arrivée en DONE",
+              content: { [JSON_CONTENT]: { schema: ref("Task") } },
+            },
+            400: problemResponse("Corps invalide ou voisin incohérent"),
+            401: UNAUTHORIZED,
+            404: problemResponse("Projet ou tâche introuvable dans ce workspace"),
+            409: problemResponse("Version obsolète"),
           },
         },
       },

@@ -63,6 +63,21 @@ enum SyncOperation {
   DELETE
 }
 
+// RF-51 : plateforme d'un appareil enregistré pour les notifications push.
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+  DESKTOP
+}
+
+// RF-50 : état d'un rappel dans le journal de livraison.
+enum ReminderStatus {
+  PENDING
+  SENT
+  CANCELLED
+}
+
 model User {
   id              String    @id @db.Uuid
   // `citext` rend l'unicité insensible à la casse sans dépendre du client
@@ -87,6 +102,8 @@ model User {
   deletedAt       DateTime? @db.Timestamptz(3)
 
   sessions  Session[]
+  devices   Device[]
+  notificationPreference NotificationPreference?
   passwordResetTokens PasswordResetToken[]
   memberships WorkspaceMember[]
   workspaces  Workspace[] @relation("WorkspaceOwner")
@@ -162,6 +179,7 @@ model Workspace {
   tasks       Task[]
   tags        Tag[]
   syncChanges SyncChange[]
+  reminderDeliveries ReminderDelivery[]
 
   @@index([ownerId])
 }
@@ -213,9 +231,15 @@ model Task {
   dueTime         String?        @db.VarChar(5)
   timezone        String         @default("Europe/Paris") @db.VarChar(64)
   completedAt     DateTime?      @db.Timestamptz(3)
+  // RF-31 : épingle indépendante de l'échéance, remise à null au désépinglage.
+  pinnedAt        DateTime?      @db.Timestamptz(3)
   // Clé de tri fractionnaire (doc 01 §9.3) : insertion entre deux éléments sans
   // réécrire les voisins. Exposée en chaîne décimale à 15 décimales.
   sortOrder       Decimal        @default(1) @db.Decimal(30, 15)
+  // RF-34 : position dans la colonne Kanban du projet. Distincte de
+  // `sortOrder` pour qu'un déplacement de carte ne réordonne pas la liste
+  // manuelle globale ; `null` = jamais déplacée, tri par `sortOrder`.
+  boardOrder      Decimal?       @db.Decimal(30, 15)
   recurrenceRule  String?        @db.VarChar(400)
   recurrenceMode  RecurrenceMode @default(FIXED)
   estimateMinutes Int?
@@ -225,6 +249,9 @@ model Task {
   // RF-21 : date de début et rappels multiples d'une tâche.
   startDate       DateTime?      @db.Date
   reminders       String[]       @default([])
+  // RF-50 : décalages relatifs (minutes avant l'échéance), en plus des
+  // rappels absolus. Le total `reminders + reminderOffsets` est plafonné à 5.
+  reminderOffsets Int[]          @default([])
   version         Int            @default(0)
   createdBy       String?        @db.Uuid
   updatedBy       String?        @db.Uuid
@@ -236,9 +263,11 @@ model Task {
   project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   parent    Task?     @relation("Subtasks", fields: [parentId], references: [id], onDelete: Cascade)
   subtasks  Task[]    @relation("Subtasks")
+  reminderDeliveries ReminderDelivery[]
 
   @@index([workspaceId, deletedAt])
   @@index([workspaceId, projectId, status, sortOrder])
+  @@index([workspaceId, projectId, status, boardOrder])
   @@index([workspaceId, dueDate])
 }
 
@@ -275,6 +304,64 @@ model Tag {
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@unique([workspaceId, nameNormalized])
+      @@unique([workspaceId, nameNormalized])
   @@index([workspaceId])
+}
+
+// RF-51 : un appareil par jeton push, désactivable indépendamment des autres.
+// Sans jeton (permission refusée, web sans Web Push), il reste enregistré pour
+// que l'utilisateur voie et pilote l'appareil courant.
+model Device {
+  id                   String         @id @db.Uuid
+  userId               String         @db.Uuid
+  platform             DevicePlatform
+  pushToken            String?        @unique @db.VarChar(255)
+  deviceName           String?        @db.VarChar(80)
+  notificationsEnabled Boolean        @default(true)
+  lastSeenAt           DateTime       @default(now()) @db.Timestamptz(3)
+  createdAt            DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// RF-50/RF-51 : préférences de notification, une ligne par utilisateur.
+model NotificationPreference {
+  userId               String   @id @db.Uuid
+  remindersEnabled     Boolean  @default(true)
+  dailySummaryEnabled  Boolean  @default(false)
+  collaborationEnabled Boolean  @default(true)
+  // Plage silencieuse `HH:mm` dans le fuseau de l'utilisateur ; vide = aucune.
+  quietHoursStart      String?  @db.VarChar(5)
+  quietHoursEnd        String?  @db.VarChar(5)
+  updatedAt            DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// RF-50 : journal des rappels planifiés. `jobId` est déterministe
+// (`reminder:<taskId>:<triggerAt>`), donc replanifier la même échéance ne crée
+// pas de doublon ; `scheduledFor` intègre la plage silencieuse.
+model ReminderDelivery {
+  id            String         @id @db.Uuid
+  workspaceId   String         @db.Uuid
+  userId        String         @db.Uuid
+  taskId        String         @db.Uuid
+  triggerAt     DateTime       @db.Timestamptz(3)
+  scheduledFor  DateTime       @db.Timestamptz(3)
+  offsetMinutes Int?
+  postponed     Boolean        @default(false)
+  status        ReminderStatus @default(PENDING)
+  sentAt        DateTime?      @db.Timestamptz(3)
+  jobId         String         @unique @db.VarChar(120)
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, triggerAt])
+  @@index([status, scheduledFor])
+  @@index([workspaceId, taskId])
 }

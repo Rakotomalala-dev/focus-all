@@ -34,6 +34,7 @@ function storedTask(id: string, workspaceId: string, sortOrder: string): StoredT
     sortOrder,
     version: 0,
     completedAt: null,
+    pinned: false,
     createdAt: TIMESTAMP,
     updatedAt: TIMESTAMP,
     tagIds: [],

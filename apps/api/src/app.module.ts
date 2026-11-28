@@ -7,9 +7,11 @@ import { AuthGuard } from "./modules/auth/auth.guard";
 import { AuthModule } from "./modules/auth/auth.module";
 import { HealthModule } from "./modules/health/health.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
+import { RemindersModule } from "./modules/reminders/reminders.module";
 import { SyncModule } from "./modules/sync/sync.module";
 import { TagsModule } from "./modules/tags/tags.module";
 import { TasksModule } from "./modules/tasks/tasks.module";
+import { ViewsModule } from "./modules/views/views.module";
 
 @Module({
   imports: [
@@ -18,8 +20,10 @@ import { TasksModule } from "./modules/tasks/tasks.module";
     AuthModule,
     HealthModule,
     ProjectsModule,
+    RemindersModule,
     TagsModule,
     TasksModule,
+    ViewsModule,
     SyncModule,
   ],
   providers: [

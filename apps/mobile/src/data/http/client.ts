@@ -35,6 +35,11 @@ export type HttpClientOptions = {
   readonly baseUrl: string;
   readonly platform: string;
   readonly auth?: HttpClientAuth;
+  /**
+   * Signal de transport pour le bandeau hors ligne : `false` sur un échec sans
+   * réponse, `true` dès qu'une réponse HTTP est reçue (quel que soit le statut).
+   */
+  readonly onNetworkStatusChange?: (isOnline: boolean) => void;
 };
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -45,6 +50,7 @@ export function createHttpClient({
   baseUrl,
   platform,
   auth,
+  onNetworkStatusChange,
 }: HttpClientOptions): HttpClient {
   const instance: AxiosInstance = axios.create({
     baseURL: baseUrl,
@@ -96,8 +102,12 @@ export function createHttpClient({
   ): Promise<T> {
     try {
       const response = await request;
+      onNetworkStatusChange?.(true);
       return schema.parse(response.data);
     } catch (error) {
+      if (axios.isAxiosError(error) && error.response === undefined) {
+        onNetworkStatusChange?.(false);
+      }
       throw toAppError(error);
     }
   }

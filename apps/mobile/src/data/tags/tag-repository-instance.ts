@@ -1,4 +1,9 @@
 import { authenticatedHttp } from "../auth/auth-instance";
+import { offlineStore } from "../offline/offline-store-instance";
+import { createCachedTagRepository } from "./cached-tag-repository";
 import { createTagRepository } from "./tag-repository";
 
-export const tagRepository = createTagRepository(authenticatedHttp);
+const httpRepository = createTagRepository(authenticatedHttp);
+
+export const remoteTagRepository = httpRepository;
+export const tagRepository = createCachedTagRepository(httpRepository, offlineStore);

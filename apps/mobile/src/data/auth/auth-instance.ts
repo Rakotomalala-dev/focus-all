@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { createHttpClient } from "../http/client";
+import { useConnectionStore } from "../offline/connection-store";
 import { createAuthApi } from "./auth-api";
 import { useSessionStore } from "./session-store";
 
@@ -46,6 +47,11 @@ export const authenticatedHttp = createHttpClient({
   auth: {
     getAccessToken: () => useSessionStore.getState().tokens?.accessToken ?? null,
     refreshAccessToken,
+  },
+  // Toute requête authentifiée renseigne la connectivité : une réponse reçue
+  // (même 4xx/5xx) prouve que le réseau est là, un échec sans réponse non.
+  onNetworkStatusChange: (isOnline) => {
+    useConnectionStore.getState().setOnline(isOnline);
   },
 });
 

@@ -129,6 +129,34 @@
       "delete": "Supprimer définitivement mon compte"
     }
   },
+  "offline": {
+    "title": "Données hors ligne",
+    "hint": "Vos tâches, projets et tags récents restent consultables sans réseau.",
+    "neverSynced": "jamais",
+    "banner": {
+      "online": "En ligne · Dernière synchronisation : {{date}}",
+      "offline": "Hors ligne · Dernière synchronisation : {{date}}",
+      "syncing": "Synchronisation en cours…",
+      "syncError": "Synchronisation impossible · Dernière synchronisation : {{date}}"
+    },
+    "status": {
+      "loading": "Lecture de la copie locale…",
+      "error": "La copie locale n'a pas pu être lue.",
+      "retry": "Réessayer",
+      "empty": "Aucune donnée locale. Reconnectez-vous à Internet pour télécharger une copie.",
+      "counts": "{{tasks}} tâche(s), {{projects}} projet(s), {{tags}} tag(s) en cache.",
+      "lastSync": "Dernière synchronisation : {{date}}",
+      "corrupted": "{{count}} entrée(s) illisible(s) dans la copie locale."
+    },
+    "reset": {
+      "hint": "Vide la copie locale puis télécharge un instantané complet. Les mutations en attente sont conservées si possible.",
+      "action": "Réinitialiser les données locales",
+      "confirm": "Confirmer la réinitialisation",
+      "cancel": "Annuler",
+      "done": "Données locales réinitialisées et instantané rechargé.",
+      "error": "Réinitialisation impossible pour le moment."
+    }
+  },
   "trash": {
     "title": "Corbeille",
     "hint": "Les éléments supprimés sont conservés 30 jours, puis purgés.",
@@ -353,6 +381,110 @@
       "modes": {
         "FIXED": "Date fixe",
         "AFTER_COMPLETION": "Après complétion"
+      }
+    }
+  },
+  "views": {
+    "nav": {
+      "today": "Aujourd'hui",
+      "upcoming": "Prochain",
+      "calendar": "Calendrier",
+      "kanban": "Kanban"
+    },
+    "error": {
+      "retry": "Réessayer"
+    },
+    "subtasks": "Sous-tâches : {{done}}/{{total}}",
+    "today": {
+      "title": "Aujourd'hui",
+      "loading": "Chargement de votre journée…",
+      "load_one": "Charge : {{duration}} · {{count}} tâche",
+      "load_other": "Charge : {{duration}} · {{count}} tâches",
+      "sectionMeta_one": "{{count}} tâche · {{duration}}",
+      "sectionMeta_other": "{{count}} tâches · {{duration}}",
+      "sections": {
+        "OVERDUE": "En retard",
+        "TODAY": "Aujourd'hui",
+        "IN_PROGRESS": "En cours",
+        "PINNED": "Épinglées",
+        "COMPLETED": "Accomplies"
+      },
+      "collapse": "Replier la section « {{section}} »",
+      "expand": "Déplier la section « {{section}} »",
+      "pin": "Épingler « {{title}} »",
+      "unpin": "Désépingler « {{title}} »",
+      "pinError": "L'épingle n'a pas pu être enregistrée.",
+      "empty": {
+        "title": "Rien pour aujourd'hui",
+        "body": "Profitez-en, ou ajoutez une tâche depuis Mes tâches."
+      },
+      "error": {
+        "title": "Impossible de charger Aujourd'hui"
+      }
+    },
+    "upcoming": {
+      "title": "Prochain",
+      "hint": "Sept jours glissants, avec la charge estimée de chaque journée.",
+      "loading": "Chargement des sept prochains jours…",
+      "dayMeta_one": "{{count}} tâche · {{duration}}",
+      "dayMeta_other": "{{count}} tâches · {{duration}}",
+      "overload": "Journée chargée",
+      "noTasks": "Rien de prévu.",
+      "empty": {
+        "title": "Semaine dégagée",
+        "body": "Aucune tâche échue dans les sept prochains jours."
+      },
+      "error": {
+        "title": "Impossible de charger Prochain"
+      }
+    },
+    "calendar": {
+      "title": "Calendrier",
+      "previous": "Période précédente",
+      "next": "Période suivante",
+      "today": "Aujourd'hui",
+      "modes": {
+        "MONTH": "Mois",
+        "WEEK": "Semaine"
+      },
+      "periodLoad_one": "{{count}} tâche · {{duration}}",
+      "periodLoad_other": "{{count}} tâches · {{duration}}",
+      "dayLabel": "{{date}} : {{count}} tâche(s)",
+      "dot_one": "{{count}}",
+      "dot_other": "{{count}}",
+      "dayMeta_one": "{{count}} tâche · {{duration}}",
+      "dayMeta_other": "{{count}} tâches · {{duration}}",
+      "emptyDay": "Aucune tâche ce jour-là.",
+      "emptyPeriod": "Aucune tâche sur cette période.",
+      "open": "Ouvrir « {{title}} »",
+      "loading": "Chargement du calendrier…",
+      "error": {
+        "title": "Impossible de charger le calendrier"
+      }
+    },
+    "kanban": {
+      "title": "Kanban",
+      "hint": "Choisissez un projet pour afficher son tableau.",
+      "project": "Projet {{name}}",
+      "open": "Ouvrir « {{title}} »",
+      "tags_one": "{{count}} tag",
+      "tags_other": "{{count}} tags",
+      "subtasks": "{{done}}/{{total}} sous-tâches",
+      "moveTo": "Déplacer « {{title}} » vers {{status}}",
+      "columnCount_one": "{{count}} carte",
+      "columnCount_other": "{{count}} cartes",
+      "loading": "Chargement du tableau…",
+      "moveError": "Le déplacement n'a pas pu être enregistré.",
+      "emptyProject": {
+        "title": "Aucun projet",
+        "body": "Créez un projet pour utiliser le Kanban."
+      },
+      "empty": {
+        "title": "Tableau vide",
+        "body": "Ajoutez une tâche à ce projet pour commencer."
+      },
+      "error": {
+        "title": "Impossible de charger le tableau"
       }
     }
   },

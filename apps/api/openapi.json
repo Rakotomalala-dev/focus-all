@@ -907,6 +907,287 @@
         }
       }
     },
+    "/api/v1/views/today": {
+      "get": {
+        "summary": "Agrégat Aujourd'hui : retards, jour, en cours, épinglées, accomplies",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "description": "Jour de référence (défaut : jour courant UTC).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sections non vides, dans l'ordre En retard, Aujourd'hui, En cours, Épinglées, Accomplies ; « Accomplies » repliée par défaut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodayView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Date invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/views/upcoming": {
+      "get": {
+        "summary": "Agrégat Prochain : sept jours glissants avec charge et surcharge",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "description": "Premier jour de la fenêtre (défaut : jour courant UTC).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sept jours, chacun avec son nombre de tâches, son estimation totale et `overloaded` (> 8 h ou > 12 tâches).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpcomingView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Date invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/views/calendar": {
+      "get": {
+        "summary": "Calendrier mensuel ou hebdomadaire, occurrences récurrentes incluses",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MONTH",
+                "WEEK"
+              ],
+              "default": "MONTH"
+            }
+          },
+          {
+            "name": "anchor",
+            "in": "query",
+            "description": "N'importe quelle date du mois ou de la semaine affichée.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Jours de la période ; les occurrences récurrentes futures sont calculées et jamais persistées.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Mode ou date invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/views/kanban": {
+      "get": {
+        "summary": "Tableau Kanban d'un projet (TODO, IN_PROGRESS, DONE)",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trois colonnes ordonnées par position de carte",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KanbanView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Projet absent ou invalide",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Projet introuvable dans ce workspace",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/views/kanban/move": {
+      "post": {
+        "summary": "Déplacer une carte : statut et position dans la colonne",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KanbanMove"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tâche mise à jour ; `completedAt` renseigné à l'arrivée en DONE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corps invalide ou voisin incohérent",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, invalide ou expiré",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Projet ou tâche introuvable dans ce workspace",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version obsolète",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tasks/order": {
       "patch": {
         "summary": "Réordonner les tâches (ordre fractionnaire persistant)",
@@ -2203,6 +2484,9 @@
               }
             ]
           },
+          "pinned": {
+            "type": "boolean"
+          },
           "sortOrder": {
             "type": "string",
             "minLength": 1
@@ -2225,6 +2509,7 @@
           "id",
           "status",
           "completedAt",
+          "pinned",
           "sortOrder",
           "version",
           "createdAt",
@@ -2457,6 +2742,9 @@
               "CANCELLED"
             ]
           },
+          "pinned": {
+            "type": "boolean"
+          },
           "version": {
             "type": "integer",
             "minimum": 0
@@ -2572,6 +2860,9 @@
                     }
                   ]
                 },
+                "pinned": {
+                  "type": "boolean"
+                },
                 "sortOrder": {
                   "type": "string",
                   "minLength": 1
@@ -2594,6 +2885,7 @@
                 "id",
                 "status",
                 "completedAt",
+                "pinned",
                 "sortOrder",
                 "version",
                 "createdAt",
@@ -2639,6 +2931,2019 @@
         },
         "required": [
           "ids"
+        ],
+        "additionalProperties": false
+      },
+      "ViewCard": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 10000
+              },
+              "projectId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "parentId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "dueDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "dueTime": {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "startDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "NONE",
+                  "LOW",
+                  "MEDIUM",
+                  "HIGH",
+                  "URGENT"
+                ],
+                "default": "NONE"
+              },
+              "tagIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "maxItems": 20,
+                "default": []
+              },
+              "reminders": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "maxItems": 10,
+                "default": []
+              },
+              "recurrenceRule": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "recurrenceMode": {
+                "type": "string",
+                "enum": [
+                  "FIXED",
+                  "AFTER_COMPLETION"
+                ],
+                "default": "FIXED"
+              },
+              "estimateMinutes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1440
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "TODO",
+                  "IN_PROGRESS",
+                  "DONE",
+                  "CANCELLED"
+                ]
+              },
+              "completedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "pinned": {
+                "type": "boolean"
+              },
+              "sortOrder": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "title",
+              "id",
+              "status",
+              "completedAt",
+              "pinned",
+              "sortOrder",
+              "version",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "projectName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subtaskCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "subtaskDoneCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "occurrenceDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "task",
+          "projectName",
+          "subtaskCount",
+          "subtaskDoneCount",
+          "occurrenceDate"
+        ],
+        "additionalProperties": false
+      },
+      "TodaySection": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "OVERDUE",
+              "TODAY",
+              "IN_PROGRESS",
+              "PINNED",
+              "COMPLETED"
+            ]
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 10000
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "parentId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "dueDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "dueTime": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                    },
+                    "startDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "priority": {
+                      "type": "string",
+                      "enum": [
+                        "NONE",
+                        "LOW",
+                        "MEDIUM",
+                        "HIGH",
+                        "URGENT"
+                      ],
+                      "default": "NONE"
+                    },
+                    "tagIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "maxItems": 20,
+                      "default": []
+                    },
+                    "reminders": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "maxItems": 10,
+                      "default": []
+                    },
+                    "recurrenceRule": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 400
+                    },
+                    "recurrenceMode": {
+                      "type": "string",
+                      "enum": [
+                        "FIXED",
+                        "AFTER_COMPLETION"
+                      ],
+                      "default": "FIXED"
+                    },
+                    "estimateMinutes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1440
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "TODO",
+                        "IN_PROGRESS",
+                        "DONE",
+                        "CANCELLED"
+                      ]
+                    },
+                    "completedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "sortOrder": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "id",
+                    "status",
+                    "completedAt",
+                    "pinned",
+                    "sortOrder",
+                    "version",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "projectName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "subtaskCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "subtaskDoneCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "occurrenceDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "task",
+                "projectName",
+                "subtaskCount",
+                "subtaskDoneCount",
+                "occurrenceDate"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "estimateMinutes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "collapsedByDefault": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "tasks",
+          "count",
+          "estimateMinutes",
+          "collapsedByDefault"
+        ],
+        "additionalProperties": false
+      },
+      "TodayView": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "OVERDUE",
+                    "TODAY",
+                    "IN_PROGRESS",
+                    "PINNED",
+                    "COMPLETED"
+                  ]
+                },
+                "tasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "task": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 10000
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "parentId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "dueDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "dueTime": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          },
+                          "startDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "priority": {
+                            "type": "string",
+                            "enum": [
+                              "NONE",
+                              "LOW",
+                              "MEDIUM",
+                              "HIGH",
+                              "URGENT"
+                            ],
+                            "default": "NONE"
+                          },
+                          "tagIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "maxItems": 20,
+                            "default": []
+                          },
+                          "reminders": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "maxItems": 10,
+                            "default": []
+                          },
+                          "recurrenceRule": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 400
+                          },
+                          "recurrenceMode": {
+                            "type": "string",
+                            "enum": [
+                              "FIXED",
+                              "AFTER_COMPLETION"
+                            ],
+                            "default": "FIXED"
+                          },
+                          "estimateMinutes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1440
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "TODO",
+                              "IN_PROGRESS",
+                              "DONE",
+                              "CANCELLED"
+                            ]
+                          },
+                          "completedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          },
+                          "sortOrder": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "id",
+                          "status",
+                          "completedAt",
+                          "pinned",
+                          "sortOrder",
+                          "version",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "projectName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "subtaskCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "subtaskDoneCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "occurrenceDate": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "task",
+                      "projectName",
+                      "subtaskCount",
+                      "subtaskDoneCount",
+                      "occurrenceDate"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "estimateMinutes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "collapsedByDefault": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "key",
+                "tasks",
+                "count",
+                "estimateMinutes",
+                "collapsedByDefault"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "loadMinutes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "loadTaskCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "date",
+          "sections",
+          "loadMinutes",
+          "loadTaskCount"
+        ],
+        "additionalProperties": false
+      },
+      "UpcomingDay": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 10000
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "parentId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "dueDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "dueTime": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                    },
+                    "startDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "priority": {
+                      "type": "string",
+                      "enum": [
+                        "NONE",
+                        "LOW",
+                        "MEDIUM",
+                        "HIGH",
+                        "URGENT"
+                      ],
+                      "default": "NONE"
+                    },
+                    "tagIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "maxItems": 20,
+                      "default": []
+                    },
+                    "reminders": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "maxItems": 10,
+                      "default": []
+                    },
+                    "recurrenceRule": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 400
+                    },
+                    "recurrenceMode": {
+                      "type": "string",
+                      "enum": [
+                        "FIXED",
+                        "AFTER_COMPLETION"
+                      ],
+                      "default": "FIXED"
+                    },
+                    "estimateMinutes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1440
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "TODO",
+                        "IN_PROGRESS",
+                        "DONE",
+                        "CANCELLED"
+                      ]
+                    },
+                    "completedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "sortOrder": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "id",
+                    "status",
+                    "completedAt",
+                    "pinned",
+                    "sortOrder",
+                    "version",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "projectName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "subtaskCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "subtaskDoneCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "occurrenceDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "task",
+                "projectName",
+                "subtaskCount",
+                "subtaskDoneCount",
+                "occurrenceDate"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "estimateMinutes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "overloaded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "date",
+          "tasks",
+          "count",
+          "estimateMinutes",
+          "overloaded"
+        ],
+        "additionalProperties": false
+      },
+      "UpcomingView": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "tasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "task": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 10000
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "parentId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "dueDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "dueTime": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          },
+                          "startDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "priority": {
+                            "type": "string",
+                            "enum": [
+                              "NONE",
+                              "LOW",
+                              "MEDIUM",
+                              "HIGH",
+                              "URGENT"
+                            ],
+                            "default": "NONE"
+                          },
+                          "tagIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "maxItems": 20,
+                            "default": []
+                          },
+                          "reminders": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "maxItems": 10,
+                            "default": []
+                          },
+                          "recurrenceRule": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 400
+                          },
+                          "recurrenceMode": {
+                            "type": "string",
+                            "enum": [
+                              "FIXED",
+                              "AFTER_COMPLETION"
+                            ],
+                            "default": "FIXED"
+                          },
+                          "estimateMinutes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1440
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "TODO",
+                              "IN_PROGRESS",
+                              "DONE",
+                              "CANCELLED"
+                            ]
+                          },
+                          "completedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          },
+                          "sortOrder": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "id",
+                          "status",
+                          "completedAt",
+                          "pinned",
+                          "sortOrder",
+                          "version",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "projectName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "subtaskCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "subtaskDoneCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "occurrenceDate": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "task",
+                      "projectName",
+                      "subtaskCount",
+                      "subtaskDoneCount",
+                      "occurrenceDate"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "estimateMinutes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "overloaded": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "date",
+                "tasks",
+                "count",
+                "estimateMinutes",
+                "overloaded"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "days"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarDay": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 10000
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "parentId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "dueDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "dueTime": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                    },
+                    "startDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "priority": {
+                      "type": "string",
+                      "enum": [
+                        "NONE",
+                        "LOW",
+                        "MEDIUM",
+                        "HIGH",
+                        "URGENT"
+                      ],
+                      "default": "NONE"
+                    },
+                    "tagIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "maxItems": 20,
+                      "default": []
+                    },
+                    "reminders": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "maxItems": 10,
+                      "default": []
+                    },
+                    "recurrenceRule": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 400
+                    },
+                    "recurrenceMode": {
+                      "type": "string",
+                      "enum": [
+                        "FIXED",
+                        "AFTER_COMPLETION"
+                      ],
+                      "default": "FIXED"
+                    },
+                    "estimateMinutes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1440
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "TODO",
+                        "IN_PROGRESS",
+                        "DONE",
+                        "CANCELLED"
+                      ]
+                    },
+                    "completedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "sortOrder": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "id",
+                    "status",
+                    "completedAt",
+                    "pinned",
+                    "sortOrder",
+                    "version",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "projectName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "subtaskCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "subtaskDoneCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "occurrenceDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "task",
+                "projectName",
+                "subtaskCount",
+                "subtaskDoneCount",
+                "occurrenceDate"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "estimateMinutes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "date",
+          "tasks",
+          "count",
+          "estimateMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarView": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "MONTH",
+              "WEEK"
+            ]
+          },
+          "anchor": {
+            "type": "string",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "tasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "task": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 10000
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "parentId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "dueDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "dueTime": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          },
+                          "startDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "priority": {
+                            "type": "string",
+                            "enum": [
+                              "NONE",
+                              "LOW",
+                              "MEDIUM",
+                              "HIGH",
+                              "URGENT"
+                            ],
+                            "default": "NONE"
+                          },
+                          "tagIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "maxItems": 20,
+                            "default": []
+                          },
+                          "reminders": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "maxItems": 10,
+                            "default": []
+                          },
+                          "recurrenceRule": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 400
+                          },
+                          "recurrenceMode": {
+                            "type": "string",
+                            "enum": [
+                              "FIXED",
+                              "AFTER_COMPLETION"
+                            ],
+                            "default": "FIXED"
+                          },
+                          "estimateMinutes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1440
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "TODO",
+                              "IN_PROGRESS",
+                              "DONE",
+                              "CANCELLED"
+                            ]
+                          },
+                          "completedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          },
+                          "sortOrder": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "id",
+                          "status",
+                          "completedAt",
+                          "pinned",
+                          "sortOrder",
+                          "version",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "projectName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "subtaskCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "subtaskDoneCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "occurrenceDate": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "task",
+                      "projectName",
+                      "subtaskCount",
+                      "subtaskDoneCount",
+                      "occurrenceDate"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "estimateMinutes": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "date",
+                "tasks",
+                "count",
+                "estimateMinutes"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "mode",
+          "anchor",
+          "from",
+          "to",
+          "days"
+        ],
+        "additionalProperties": false
+      },
+      "KanbanColumn": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "TODO",
+              "IN_PROGRESS",
+              "DONE"
+            ]
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 10000
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "parentId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "dueDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "dueTime": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                    },
+                    "startDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "priority": {
+                      "type": "string",
+                      "enum": [
+                        "NONE",
+                        "LOW",
+                        "MEDIUM",
+                        "HIGH",
+                        "URGENT"
+                      ],
+                      "default": "NONE"
+                    },
+                    "tagIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "maxItems": 20,
+                      "default": []
+                    },
+                    "reminders": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "maxItems": 10,
+                      "default": []
+                    },
+                    "recurrenceRule": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 400
+                    },
+                    "recurrenceMode": {
+                      "type": "string",
+                      "enum": [
+                        "FIXED",
+                        "AFTER_COMPLETION"
+                      ],
+                      "default": "FIXED"
+                    },
+                    "estimateMinutes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1440
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "TODO",
+                        "IN_PROGRESS",
+                        "DONE",
+                        "CANCELLED"
+                      ]
+                    },
+                    "completedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "sortOrder": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "id",
+                    "status",
+                    "completedAt",
+                    "pinned",
+                    "sortOrder",
+                    "version",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "projectName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "subtaskCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "subtaskDoneCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "occurrenceDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "task",
+                "projectName",
+                "subtaskCount",
+                "subtaskDoneCount",
+                "occurrenceDate"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "status",
+          "tasks",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "KanbanView": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projectName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "TODO",
+                    "IN_PROGRESS",
+                    "DONE"
+                  ]
+                },
+                "tasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "task": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 10000
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "parentId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "dueDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "dueTime": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          },
+                          "startDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "priority": {
+                            "type": "string",
+                            "enum": [
+                              "NONE",
+                              "LOW",
+                              "MEDIUM",
+                              "HIGH",
+                              "URGENT"
+                            ],
+                            "default": "NONE"
+                          },
+                          "tagIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "maxItems": 20,
+                            "default": []
+                          },
+                          "reminders": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "maxItems": 10,
+                            "default": []
+                          },
+                          "recurrenceRule": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 400
+                          },
+                          "recurrenceMode": {
+                            "type": "string",
+                            "enum": [
+                              "FIXED",
+                              "AFTER_COMPLETION"
+                            ],
+                            "default": "FIXED"
+                          },
+                          "estimateMinutes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1440
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "TODO",
+                              "IN_PROGRESS",
+                              "DONE",
+                              "CANCELLED"
+                            ]
+                          },
+                          "completedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          },
+                          "sortOrder": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "id",
+                          "status",
+                          "completedAt",
+                          "pinned",
+                          "sortOrder",
+                          "version",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "projectName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "subtaskCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "subtaskDoneCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "occurrenceDate": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "task",
+                      "projectName",
+                      "subtaskCount",
+                      "subtaskDoneCount",
+                      "occurrenceDate"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "status",
+                "tasks",
+                "count"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "projectId",
+          "projectName",
+          "columns"
+        ],
+        "additionalProperties": false
+      },
+      "KanbanMove": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "TODO",
+              "IN_PROGRESS",
+              "DONE"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "afterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "beforeId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "projectId",
+          "taskId",
+          "status",
+          "version"
         ],
         "additionalProperties": false
       },
@@ -2781,6 +5086,9 @@
                     }
                   ]
                 },
+                "pinned": {
+                  "type": "boolean"
+                },
                 "sortOrder": {
                   "type": "string",
                   "minLength": 1
@@ -2803,6 +5111,7 @@
                 "id",
                 "status",
                 "completedAt",
+                "pinned",
                 "sortOrder",
                 "version",
                 "createdAt",
@@ -4397,6 +6706,9 @@
                             }
                           ]
                         },
+                        "pinned": {
+                          "type": "boolean"
+                        },
                         "sortOrder": {
                           "type": "string",
                           "minLength": 1
@@ -4419,6 +6731,7 @@
                         "id",
                         "status",
                         "completedAt",
+                        "pinned",
                         "sortOrder",
                         "version",
                         "createdAt",
@@ -4700,6 +7013,9 @@
                     }
                   ]
                 },
+                "pinned": {
+                  "type": "boolean"
+                },
                 "sortOrder": {
                   "type": "string",
                   "minLength": 1
@@ -4722,6 +7038,7 @@
                 "id",
                 "status",
                 "completedAt",
+                "pinned",
                 "sortOrder",
                 "version",
                 "createdAt",

@@ -16,6 +16,10 @@ vi.mock("expo-router", () => ({
   useRouter: () => ({ replace: mocks.routerReplace, back: vi.fn() }),
 }));
 
+vi.mock("../../offline", () => ({
+  OfflineDataSection: () => null,
+}));
+
 vi.mock("../../auth/api/use-auth", () => ({
   useSession: () => ({
     user: {

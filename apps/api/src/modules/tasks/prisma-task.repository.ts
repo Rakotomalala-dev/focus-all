@@ -1,11 +1,12 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Prisma, type Task as TaskRow } from "@prisma/client";
-import type { Task, TaskDraft, TaskSort } from "@focus/contracts";
+import type { Task, TaskDraft, TaskSort, TaskStatus } from "@focus/contracts";
 import { PrismaService } from "../../database/prisma.service";
 import { uuidV7 } from "../../common/uuid-v7";
 import { toTask, toTaskPayload } from "./task.mapper";
 import { priorityRank } from "./task.repository";
 import type {
+  BoardPosition,
   MutationOptions,
   MutationResult,
   TaskCursor,
@@ -160,6 +161,7 @@ export class PrismaTaskRepository implements TaskRepository {
           version: 0,
           tagIds: [...draft.tagIds],
           reminders: [...draft.reminders],
+          reminderOffsets: [...draft.reminderOffsets],
           recurrenceMode: draft.recurrenceMode,
           ...(draft.description === undefined ? {} : { description: draft.description }),
           ...(draft.projectId === undefined ? {} : { projectId: draft.projectId }),
@@ -238,6 +240,9 @@ export class PrismaTaskRepository implements TaskRepository {
           ...(patch.priority === undefined ? {} : { priority: patch.priority }),
           ...(patch.tagIds === undefined ? {} : { tagIds: [...patch.tagIds] }),
           ...(patch.reminders === undefined ? {} : { reminders: [...patch.reminders] }),
+          ...(patch.reminderOffsets === undefined
+            ? {}
+            : { reminderOffsets: [...patch.reminderOffsets] }),
           ...(patch.recurrenceRule === undefined
             ? {}
             : { recurrenceRule: patch.recurrenceRule }),
@@ -249,6 +254,7 @@ export class PrismaTaskRepository implements TaskRepository {
             : { estimateMinutes: patch.estimateMinutes }),
           ...(patch.status === undefined ? {} : { status: patch.status }),
           ...(patch.status === undefined ? {} : { completedAt }),
+          ...(patch.pinned === undefined ? {} : { pinnedAt: patch.pinned ? now : null }),
           version: { increment: 1 },
           ...(options?.actorId === undefined ? {} : { updatedBy: options.actorId }),
         },
@@ -338,6 +344,104 @@ export class PrismaTaskRepository implements TaskRepository {
         operation: "DELETE",
         version: row.version,
         payload: { id },
+        options,
+      });
+      return { status: "ok", task };
+    });
+  }
+
+  // RF-34 : statut + position dans la colonne Kanban du projet, dans la même
+  // transaction que le journal de synchronisation (N-4), donc visible sur un
+  // autre appareil après `sync/pull`.
+  async moveOnBoard(
+    id: string,
+    workspaceId: string,
+    expectedVersion: number,
+    status: TaskStatus,
+    position: BoardPosition,
+    options?: MutationOptions,
+  ): Promise<MutationResult> {
+    return this.transaction(async (tx) => {
+      const existing = await tx.task.findFirst({
+        where: { id, workspaceId, deletedAt: null },
+      });
+      if (existing === null || existing.projectId === null) {
+        return { status: "not_found" };
+      }
+      if (existing.version !== expectedVersion) {
+        return { status: "conflict", currentVersion: existing.version };
+      }
+      const projectId = existing.projectId;
+
+      const anchor = async (
+        neighborId: string | null | undefined,
+      ): Promise<Prisma.Decimal | null> => {
+        if (neighborId === null || neighborId === undefined) {
+          return null;
+        }
+        const row = await tx.task.findFirst({
+          where: {
+            id: neighborId,
+            workspaceId,
+            projectId,
+            status,
+            deletedAt: null,
+          },
+          select: { boardOrder: true, sortOrder: true },
+        });
+        return row === null ? null : (row.boardOrder ?? row.sortOrder);
+      };
+
+      const after = await anchor(position.afterId);
+      const before = await anchor(position.beforeId);
+
+      let boardOrder: Prisma.Decimal;
+      if (after !== null && before !== null) {
+        boardOrder = after.plus(before).dividedBy(2);
+      } else if (after !== null) {
+        boardOrder = after.plus(1);
+      } else if (before !== null) {
+        boardOrder = before.minus(1);
+      } else {
+        const max = await tx.task.aggregate({
+          where: {
+            workspaceId,
+            projectId,
+            status,
+            deletedAt: null,
+          },
+          _max: { boardOrder: true },
+        });
+        boardOrder = (max._max.boardOrder ?? new Prisma.Decimal(0)).plus(1);
+      }
+
+      const now = new Date();
+      const completedAt = status === "DONE" ? (existing.completedAt ?? now) : null;
+      const updated = await tx.task.updateMany({
+        where: { id, workspaceId, deletedAt: null, version: expectedVersion },
+        data: {
+          status,
+          completedAt,
+          boardOrder,
+          version: { increment: 1 },
+          ...(options?.actorId === undefined ? {} : { updatedBy: options.actorId }),
+        },
+      });
+      if (updated.count === 0) {
+        const current = await tx.task.findFirst({ where: { id, workspaceId, deletedAt: null } });
+        return current === null
+          ? { status: "not_found" }
+          : { status: "conflict", currentVersion: current.version };
+      }
+
+      const row = await tx.task.findUniqueOrThrow({ where: { id } });
+      const task = toTask(row);
+      await this.recordChange(tx, {
+        workspaceId,
+        entityId: id,
+        operation: "UPSERT",
+        version: row.version,
+        payload: toTaskPayload(task),
         options,
       });
       return { status: "ok", task };

@@ -10,7 +10,7 @@ export type Palette = {
   readonly text: { readonly primary: string; readonly muted: string; readonly onAccent: string };
   readonly accent: string;
   readonly accentAlt: string;
-  readonly state: { readonly success: string; readonly danger: string };
+  readonly state: { readonly success: string; readonly danger: string; readonly warning: string };
   readonly priority: { readonly urgent: string };
   // Bordure 1 px à 8 % d'opacité : le langage « papier calme » préfère les
   // bordures aux ombres (doc 01 §7.5, doc 04 §11.2).
@@ -23,7 +23,7 @@ export const palettes: Readonly<Record<ThemeMode, Palette>> = {
     text: { primary: "#14181D", muted: "#5A6068", onAccent: "#14181D" },
     accent: "#E8A33D",
     accentAlt: "#4F8DF7",
-    state: { success: "#3FB984", danger: "#E05C5C" },
+    state: { success: "#3FB984", danger: "#E05C5C", warning: "#8A5200" },
     priority: { urgent: "#F0553C" },
     border: "rgba(11, 15, 20, 0.08)",
   },
@@ -32,7 +32,7 @@ export const palettes: Readonly<Record<ThemeMode, Palette>> = {
     text: { primary: "#ECEEF1", muted: "#9AA3AE", onAccent: "#14181D" },
     accent: "#E8A33D",
     accentAlt: "#4F8DF7",
-    state: { success: "#3FB984", danger: "#E05C5C" },
+    state: { success: "#3FB984", danger: "#E05C5C", warning: "#F2B65C" },
     priority: { urgent: "#F0553C" },
     border: "rgba(255, 255, 255, 0.08)",
   },

@@ -24,6 +24,7 @@ function task(id: string, sortOrder: string): StoredTask {
     sortOrder,
     version: 0,
     completedAt: null,
+    pinned: false,
     createdAt: TIMESTAMP,
     updatedAt: TIMESTAMP,
     tagIds: [],

@@ -752,6 +752,22 @@ curl -s "http://localhost:4000/api/v1/sync/pull?since=1042&limit=500" \
 
 Réponse : `{ "changes": [...], "nextCursor": 1058, "hasMore": false }`. Curseur trop ancien : `410` avec `code: "SYNC_CURSOR_EXPIRED"` → appeler `/sync/snapshot`.
 
+#### 6.3.1 Miroir local hors ligne (M1)
+
+Le client conserve une copie en lecture des tâches, projets et tags (RF-61) et peut la réinitialiser (RF-64).
+
+| Élément | Détail |
+|---|---|
+| Instantané | `GET /api/v1/sync/snapshot` remplit la collection `tasks` et les métadonnées `cursor`/`lastSyncAt` ; les listes `/projects` et `/tags` complètent le miroir. |
+| Base native | `expo-sqlite`, fichier `focus-offline.db` : `offline_entities(collection, id, payload)` + `offline_meta(key, value)`. Une entrée illisible est ignorée et comptée pour guider la réinitialisation. |
+| Web | Même contrat via `localStorage` (`focus.offline.*`) : l'export Expo ne charge pas le module natif SQLite. |
+| Lecture | `createCachedTaskRepository` sert la copie locale (filtres et tri reproduits, première page) dès qu'une requête échoue sans réponse et qu'un instantané existe. Une réponse serveur en erreur (4xx/5xx) n'est jamais masquée par le miroir. |
+| Écriture | Hors périmètre M1 : les mutations restent en ligne (RF-62, V1.1). |
+| Bandeau | `ConnectionBanner` affiche en ligne/hors ligne, la dernière synchronisation, la synchronisation en cours et son échec. |
+| Réinitialisation | Réglages → « Réinitialiser les données locales » : vide la copie et le curseur, conserve `deviceId` (et l'outbox si elle existe), puis force un instantané complet. |
+
+Code : `apps/mobile/src/data/offline/*`, `apps/mobile/src/features/offline/*`. Vérifications : `pnpm --filter @focus/mobile test` et `pnpm --filter @focus/mobile typecheck`.
+
 ### 6.4 Conventions d'erreur et de validation
 
 Le détail du format `application/problem+json` et la liste des codes sont dans doc 01 §10.2. Côté client, l'intercepteur Axios normalise :

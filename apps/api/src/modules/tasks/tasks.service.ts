@@ -18,6 +18,7 @@ import { DomainError } from "../../common/domain-error";
 import { describeIssues } from "../../common/zod-issues";
 import type { AuthContext } from "../auth/auth-context";
 import { PROJECT_REPOSITORY, type ProjectRepository } from "../projects/project.repository";
+import { RemindersService } from "../reminders/reminders.service";
 import { TAG_REPOSITORY, type TagRepository } from "../tags/tag.repository";
 import { assertRecurrenceRule, nextOccurrence } from "./recurrence";
 import { cursorOf, type MutationResult, type TaskCursor, type TaskFilters, type TaskPatch, type TaskRepository } from "./task.repository";
@@ -94,6 +95,7 @@ export class TasksService {
     @Inject(TASK_REPOSITORY) private readonly tasks: TaskRepository,
     @Inject(TAG_REPOSITORY) private readonly tags: TagRepository,
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
+    @Inject(RemindersService) private readonly reminders: RemindersService,
   ) {}
 
   async create(auth: AuthContext, rawBody: unknown): Promise<Task> {
@@ -102,7 +104,13 @@ export class TasksService {
       throw new BadRequestException(describeIssues(parsed.error.issues));
     }
     const draft = await this.validateDraft(auth, parsed.data);
-    return this.tasks.create(draft, auth.workspaceId, { actorId: auth.userId });
+    const task = await this.tasks.create(draft, auth.workspaceId, { actorId: auth.userId });
+    // RF-50 : les rappels de la nouvelle tâche sont planifiés immédiatement.
+    await this.reminders.scheduleTask(task, {
+      userId: auth.userId,
+      workspaceId: auth.workspaceId,
+    });
+    return task;
   }
 
   private async validateDraft(auth: AuthContext, draft: TaskDraft): Promise<TaskDraft> {
@@ -147,6 +155,13 @@ export class TasksService {
         throw new DomainError("task.project_archived");
       }
     }
+
+    // RF-50 : cinq rappels au total, et un rappel relatif exige une échéance.
+    RemindersService.assertReminderBudget(
+      draft.reminders,
+      draft.reminderOffsets,
+      dueDate,
+    );
 
     return {
       ...draft,
@@ -218,6 +233,12 @@ export class TasksService {
       throw new DomainError("request.empty_patch");
     }
 
+    RemindersService.assertReminderBudget(
+      patch.reminders ?? existing.reminders,
+      patch.reminderOffsets ?? existing.reminderOffsets,
+      patch.dueDate === undefined ? existing.dueDate : (patch.dueDate ?? undefined),
+    );
+
     const updated = this.applyMutation(
       await this.tasks.update(id, auth.workspaceId, patch, expected.version, {
         actorId: auth.userId,
@@ -236,12 +257,13 @@ export class TasksService {
       const mode: RecurrenceMode = updated.recurrenceMode;
       const completedOn = (updated.completedAt ?? new Date().toISOString()).slice(0, 10);
       const nextDate = nextOccurrence(updated.recurrenceRule, updated.dueDate, mode, completedOn);
-      await this.tasks.create(
+      const next = await this.tasks.create(
         {
           title: updated.title,
           priority: updated.priority,
           tagIds: updated.tagIds,
           reminders: updated.reminders,
+          reminderOffsets: updated.reminderOffsets,
           recurrenceMode: updated.recurrenceMode,
           recurrenceRule: updated.recurrenceRule,
           dueDate: nextDate,
@@ -256,6 +278,21 @@ export class TasksService {
         auth.workspaceId,
         { actorId: auth.userId },
       );
+      await this.reminders.scheduleTask(next, {
+        userId: auth.userId,
+        workspaceId: auth.workspaceId,
+      });
+    }
+
+    // RF-50 : une tâche terminée ou annulée ne doit plus rappeler son échéance.
+    if (updated.status === "DONE" || updated.status === "CANCELLED") {
+      await this.reminders.cancelTask(updated.id);
+    } else {
+      // Toute modification d'échéance ou de rappel replanifie (idempotent).
+      await this.reminders.scheduleTask(updated, {
+        userId: auth.userId,
+        workspaceId: auth.workspaceId,
+      });
     }
 
     return updated;
@@ -281,12 +318,16 @@ export class TasksService {
       ...(fields.priority === undefined ? {} : { priority: fields.priority }),
       ...(fields.tagIds === undefined ? {} : { tagIds: fields.tagIds }),
       ...(fields.reminders === undefined ? {} : { reminders: fields.reminders }),
+      ...(fields.reminderOffsets === undefined
+        ? {}
+        : { reminderOffsets: fields.reminderOffsets }),
       ...(fields.recurrenceRule === undefined ? {} : { recurrenceRule: fields.recurrenceRule }),
       ...(fields.recurrenceMode === undefined ? {} : { recurrenceMode: fields.recurrenceMode }),
       ...(fields.estimateMinutes === undefined
         ? {}
         : { estimateMinutes: fields.estimateMinutes }),
       ...(fields.status === undefined ? {} : { status: fields.status }),
+      ...(fields.pinned === undefined ? {} : { pinned: fields.pinned }),
     };
 
     if (fields.parentId !== undefined) {
@@ -368,6 +409,7 @@ export class TasksService {
       await this.tasks.remove(id, auth.workspaceId, expected.version, { actorId: auth.userId }),
       expected.source,
     );
+    await this.reminders.cancelTask(id);
   }
 
   async restore(auth: AuthContext, rawId: string): Promise<Task> {
@@ -377,6 +419,10 @@ export class TasksService {
     if (result.status !== "ok") {
       throw new DomainError("task.not_found");
     }
+    await this.reminders.scheduleTask(result.task, {
+      userId: auth.userId,
+      workspaceId: auth.workspaceId,
+    });
     return result.task;
   }
 

@@ -824,8 +824,11 @@ Codes applicatifs stables : `VALIDATION_ERROR`, `UNAUTHENTICATED`, `SESSION_EXPI
 | `GET` | `/tags` | tags du workspace |
 | `POST` | `/tags` | création |
 | `PATCH` / `DELETE` | `/tags/:id` | mise à jour / suppression |
-| `GET` | `/views/today` | agrégat : en retard + aujourd'hui + épinglés |
-| `GET` | `/views/upcoming` | agrégat sur 7 jours |
+| `GET` | `/views/today` | agrégat : en retard + aujourd'hui + en cours + épinglées + accomplies |
+| `GET` | `/views/upcoming` | agrégat sur 7 jours glissants, charge et surcharge par jour |
+| `GET` | `/views/calendar` | calendrier mois ou semaine (`?mode=&anchor=`), occurrences récurrentes incluses |
+| `GET` | `/views/kanban` | tableau d'un projet (`?projectId=`), colonnes TODO / IN_PROGRESS / DONE |
+| `POST` | `/views/kanban/move` | déplacement d'une carte : statut + position |
 | `GET` | `/search` | recherche plein texte (`?q=`) |
 | `GET` | `/sync/pull` | changements depuis un curseur |
 | `POST` | `/sync/push` | lot de mutations hors ligne |
@@ -865,6 +868,21 @@ export type CreateTaskInput = z.infer<typeof createTaskInput>;
 
 > Les noms d'API Zod v4 (`z.uuid()`, `z.iso.date()`) diffèrent de v3 (`z.string().uuid()`). La version est figée dans `packages/contracts` et documentée en doc 03 ; aucune contention de syntaxe mixte n'est autorisée.
 
+### 10.5 Vues agrégées (RF-31 à RF-35)
+
+Les quatre vues sont calculées **côté serveur** en une seule réponse (`@focus/contracts/src/views.ts`) : le client ne recompose jamais les sections ni les compteurs de charge. Chaque carte (`ViewCard`) porte la tâche, le nom du projet, l'avancement des sous-tâches et `occurrenceDate` (`null` sans échéance).
+
+| Vue | Règles de calcul |
+|---|---|
+| `today` | Sections non vides, dans l'ordre `OVERDUE` (échéance < jour), `TODAY` (échéance = jour), `IN_PROGRESS` (en cours, échéance dans les 7 jours, non déjà listée), `PINNED` (épinglée, non déjà listée), `COMPLETED` (terminée ce jour). Une tâche n'apparaît qu'une fois ; les sous-tâches et les tâches annulées sont exclues. `collapsedByDefault` vaut `true` pour `COMPLETED` seulement. `loadMinutes`/`loadTaskCount` somment les cartes actives affichées. |
+| `upcoming` | Sept jours glissants à partir de `date` (défaut : jour courant UTC), un objet par jour même vide. `estimateMinutes` = somme des estimations ; `overloaded` = plus de 8 h estimées ou plus de 12 tâches. |
+| `calendar` | `MONTH` = du 1er au dernier jour du mois d'`anchor` ; `WEEK` = lundi → dimanche. Un jour par date, tri par heure puis priorité puis `sortOrder`. Les occurrences des séries `FIXED` sont calculées à la volée et **jamais persistées** ; en `AFTER_COMPLETION` les dates futures dépendent de la complétion, donc aucune occurrence virtuelle n'est produite. Lecture seule au MVP. |
+| `kanban` | Projet obligatoire, trois colonnes fixes. Ordre d'une colonne : `boardOrder` puis `sortOrder` puis `id`. `POST /views/kanban/move` accepte `projectId`, `taskId`, `status`, `version`, `afterId`/`beforeId` (voisines de destination, `null` = fin de colonne) et renvoie la tâche mise à jour. Le passage à `DONE` renseigne `completedAt` et la transaction écrit le `SyncChange`, donc l'autre appareil voit le déplacement après `sync/pull`. |
+
+Deux colonnes internes soutiennent ces vues : `Task.pinnedAt` (épingle indépendante de l'échéance, exposée en `Task.pinned` et modifiable via `PATCH /tasks/:id`) et `Task.boardOrder` (position de carte propre au projet, jamais exposée, pour qu'un déplacement Kanban ne réordonne pas la liste manuelle globale). Les erreurs restent celles du domaine : projet ou tâche hors workspace → `404`, version de carte obsolète → `409 CONFLICT_VERSION`.
+
+Côté mobile, chaque vue implémente les quatre états (chargement, erreur, vide, contenu) et se trouve sous `apps/mobile/app/views/`. Les filtres combinables de RF-35 restent portés par la liste de tâches (`GET /tasks`), qui partage les mêmes puces retirables.
+
 ---
 
 ## 11. Synchronisation et mode hors ligne
@@ -872,6 +890,8 @@ export type CreateTaskInput = z.infer<typeof createTaskInput>;
 ### 11.1 Modèle de stockage local
 
 Le client maintient une base SQLite miroir (`expo-sqlite`) : `tasks`, `projects`, `tags`, `task_tags`, `reminders`, `meta` (curseur, `lastSyncAt`, `deviceId`) et `outbox`.
+
+> **M1 (lecture seule).** Le miroir implémenté stocke les entités sérialisées dans `offline_entities(collection, id, payload)` et les métadonnées dans `offline_meta` ; la normalisation `task_tags`/`reminders` et l'`outbox` arrivent avec l'écriture hors ligne (RF-62, V1.1). Sur le Web, le même contrat est persisté en `localStorage` pour ne pas embarquer le module natif.
 
 ```mermaid
 flowchart LR

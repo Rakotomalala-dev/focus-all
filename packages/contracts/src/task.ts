@@ -25,7 +25,8 @@ export type DueFilter = z.infer<typeof dueFilterSchema>;
 export const MAX_TASK_TITLE_LENGTH = 500;
 export const MAX_TASK_DESCRIPTION_LENGTH = 10_000;
 export const MAX_TASK_TAGS = 20;
-export const MAX_TASK_REMINDERS = 10;
+// RF-50 : cinq rappels au maximum par tâche, absolus et relatifs confondus.
+export const MAX_TASK_REMINDERS = 5;
 export const MAX_SUBTASKS = 50;
 export const MAX_RECURRENCE_LENGTH = 400;
 export const DEFAULT_PAGE_SIZE = 50;
@@ -56,6 +57,11 @@ export const taskDraftSchema = z.object({
   priority: taskPrioritySchema.default("NONE"),
   tagIds: z.array(uuidSchema).max(MAX_TASK_TAGS).default([]),
   reminders: z.array(isoDateTimeSchema).max(MAX_TASK_REMINDERS).default([]),
+  // RF-50 : décalages en minutes avant `dueDate`/`dueTime` (5, 15, 30, 60, 1440).
+  reminderOffsets: z
+    .array(z.number().int().min(0).max(20_160))
+    .max(MAX_TASK_REMINDERS)
+    .default([]),
   recurrenceRule: z.string().trim().min(1).max(MAX_RECURRENCE_LENGTH).optional(),
   recurrenceMode: recurrenceModeSchema.default("FIXED"),
   estimateMinutes: z.number().int().min(1).max(24 * 60).optional(),
@@ -72,6 +78,8 @@ export const taskSchema = taskDraftSchema.extend({
   id: uuidSchema,
   status: taskStatusSchema,
   completedAt: isoDateTimeSchema.nullable(),
+  // RF-31 : une tâche épinglée apparaît dans Aujourd'hui même sans échéance.
+  pinned: z.boolean(),
   sortOrder: z.string().min(1),
   version: z.number().int().nonnegative(),
   createdAt: isoDateTimeSchema,
@@ -133,10 +141,16 @@ export const taskUpdateSchema = z.object({
   priority: taskPrioritySchema.optional(),
   tagIds: z.array(uuidSchema).max(MAX_TASK_TAGS).optional(),
   reminders: z.array(isoDateTimeSchema).max(MAX_TASK_REMINDERS).optional(),
+  reminderOffsets: z
+    .array(z.number().int().min(0).max(20_160))
+    .max(MAX_TASK_REMINDERS)
+    .optional(),
   recurrenceRule: z.string().trim().min(1).max(MAX_RECURRENCE_LENGTH).nullable().optional(),
   recurrenceMode: recurrenceModeSchema.optional(),
   estimateMinutes: z.number().int().min(1).max(24 * 60).nullable().optional(),
   status: taskStatusSchema.optional(),
+  // Épingle ou dépingle la tâche (RF-31).
+  pinned: z.boolean().optional(),
   // Version attendue par le client : contrôle optimiste (409 CONFLICT_VERSION).
   version: z.number().int().nonnegative().optional(),
 });

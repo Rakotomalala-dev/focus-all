@@ -40,6 +40,7 @@ describe("taskSchema", () => {
     title: "Tâche",
     status: "TODO",
     completedAt: null,
+    pinned: false,
     sortOrder: "a0",
     version: 0,
     createdAt: NOW,

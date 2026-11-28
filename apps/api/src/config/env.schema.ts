@@ -52,6 +52,9 @@ export const envSchema = z.object({
   // clair dans les logs (S-5).
   SMTP_URL: z.preprocess(emptyAsUndefined, z.string().url().optional()),
   MAIL_FROM: z.string().min(1).default("Focus <no-reply@focus.local>"),
+  // Jeton Expo optionnel pour l'envoi de push (RF-51). Sans jeton, l'API
+  // appelle le service public Expo sans authentification (suffisant en dev).
+  EXPO_ACCESS_TOKEN: z.preprocess(emptyAsUndefined, z.string().min(1).optional()),
   // Base des liens envoyés par e-mail (web/PWA).
   APP_PUBLIC_URL: z.preprocess(
     emptyAsUndefined,

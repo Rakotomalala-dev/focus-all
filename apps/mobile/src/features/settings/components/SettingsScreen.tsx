@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { OfflineDataSection } from "../../offline";
 import { useDeleteAccount, useSession } from "../../auth/api/use-auth";
 import { appErrorMessageKey } from "../../../data/http/app-error";
 import {
@@ -410,6 +411,8 @@ export function SettingsScreen() {
               ))
             : null}
         </Section>
+
+        <OfflineDataSection />
 
         <Section title={t("settings.danger.title")}>
           <Action
