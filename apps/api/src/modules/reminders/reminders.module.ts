@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AppConfigModule } from "../../config/app-config.module";
 import { ExpoPushSender, PUSH_SENDER } from "./expo-push.sender";
 import { PrismaReminderRepository } from "./prisma-reminder.repository";
 import { REMINDER_REPOSITORY } from "./reminder.repository";
@@ -7,6 +8,7 @@ import { RemindersService } from "./reminders.service";
 import { RemindersWorker } from "./reminders.worker";
 
 @Module({
+  imports: [AppConfigModule],
   controllers: [RemindersController],
   providers: [
     RemindersService,

@@ -20,6 +20,10 @@ vi.mock("../../offline", () => ({
   OfflineDataSection: () => null,
 }));
 
+vi.mock("../../notifications", () => ({
+  NotificationsSection: () => null,
+}));
+
 vi.mock("../../auth/api/use-auth", () => ({
   useSession: () => ({
     user: {

@@ -107,8 +107,9 @@ export class InMemoryReminderRepository implements ReminderRepository {
   ): Promise<NotificationPreferences> {
     const current = await this.preferences(userId);
     const next: NotificationPreferences = {
-      ...current,
-      ...patch,
+      remindersEnabled: patch.remindersEnabled ?? current.remindersEnabled,
+      dailySummaryEnabled: patch.dailySummaryEnabled ?? current.dailySummaryEnabled,
+      collaborationEnabled: patch.collaborationEnabled ?? current.collaborationEnabled,
       quietHours:
         patch.quietHours === undefined ? current.quietHours : patch.quietHours,
     };

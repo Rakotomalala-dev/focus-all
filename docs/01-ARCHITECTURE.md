@@ -1010,6 +1010,8 @@ flowchart LR
 | Préférences | L'utilisateur choisit canal et plage horaire silencieuse (doc 02, RF-xx) ; les notifications respectent ces préférences côté serveur |
 | Purge | Jobs de maintenance : sessions expirées, tombstones > 90 j, outbox serveur inutilisée, exports > 7 j |
 
+> **M1 (2026-11-28).** La redondance est en place : le serveur planifie et livre par Expo Push (`RemindersService` + worker de polling 30 s), et l'app Android planifie les mêmes instants localement (`expo-notifications`), avec report hors plage silencieuse et désactivation par catégorie/appareil. Le worker BullMQ de la cible reste remplaçable derrière `dispatchDue` ; l'écriture hors ligne (RF-62) n'est pas implémentée.
+
 ---
 
 ## 14. Infrastructure et déploiement

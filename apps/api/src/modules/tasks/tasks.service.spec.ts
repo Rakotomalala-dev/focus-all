@@ -4,6 +4,8 @@ import type { AuthContext } from "../auth/auth-context";
 import { DomainError } from "../../common/domain-error";
 import { InMemoryTaskRepository } from "./task.repository";
 import type { ProjectRepository } from "../projects/project.repository";
+import { InMemoryReminderRepository } from "../reminders/reminder.repository";
+import { RemindersService } from "../reminders/reminders.service";
 import type { TagRepository } from "../tags/tag.repository";
 import { TasksService } from "./tasks.service";
 
@@ -17,6 +19,9 @@ function createService(): TasksService {
     new InMemoryTaskRepository(),
     {} as TagRepository,
     {} as ProjectRepository,
+    new RemindersService(new InMemoryReminderRepository(), {
+      send: async () => undefined,
+    }),
   );
 }
 

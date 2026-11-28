@@ -1,5 +1,7 @@
 import type { LoginInput, ProfileUpdate, RegisterInput } from "@focus/contracts";
 import i18n from "../../i18n";
+import { pushRegistration } from "../notifications/push-registration-instance";
+import { reminderSync } from "../notifications/reminder-sync-instance";
 import { queryClient } from "../query-client";
 import { authApi } from "./auth-instance";
 import { useSessionStore } from "./session-store";
@@ -41,6 +43,15 @@ export async function signOut(): Promise<void> {
   } catch {
     // Le serveur peut être injoignable : la session locale doit tomber quand
     // même, sinon l'utilisateur reste bloqué dans une session qu'il a quittée.
+  }
+
+  try {
+    // Aucun rappel de ce compte ne doit survivre à la déconnexion, ni aucun
+    // push vers l'appareil.
+    await reminderSync.cancelAll();
+    await pushRegistration.unregister();
+  } catch {
+    // Le nettoyage distant reste au mieux : la session locale prime.
   }
 
   useSessionStore.getState().clear();

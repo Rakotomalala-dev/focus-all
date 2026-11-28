@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { NotificationsSection } from "../../notifications";
 import { OfflineDataSection } from "../../offline";
 import { useDeleteAccount, useSession } from "../../auth/api/use-auth";
 import { appErrorMessageKey } from "../../../data/http/app-error";
@@ -411,6 +412,8 @@ export function SettingsScreen() {
               ))
             : null}
         </Section>
+
+        <NotificationsSection />
 
         <OfflineDataSection />
 

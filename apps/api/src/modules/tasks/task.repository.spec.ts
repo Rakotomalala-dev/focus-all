@@ -29,6 +29,7 @@ function task(id: string, sortOrder: string): StoredTask {
     updatedAt: TIMESTAMP,
     tagIds: [],
     reminders: [],
+    reminderOffsets: [],
     recurrenceMode: "FIXED",
   };
 }

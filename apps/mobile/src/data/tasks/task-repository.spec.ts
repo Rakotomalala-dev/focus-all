@@ -9,6 +9,7 @@ const TASK: Task = {
   priority: "NONE",
   tagIds: [],
   reminders: [],
+  reminderOffsets: [],
   recurrenceMode: "FIXED",
   status: "TODO",
   completedAt: null,
@@ -98,6 +99,7 @@ describe("taskRepository", () => {
         priority: "NONE",
         tagIds: [],
         reminders: [],
+        reminderOffsets: [],
         recurrenceMode: "FIXED",
       },
     });

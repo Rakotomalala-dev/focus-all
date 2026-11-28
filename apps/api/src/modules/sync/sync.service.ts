@@ -181,7 +181,11 @@ export class SyncService {
       options,
     );
     const updateResult = await this.toResult(mutation, auth.workspaceId, updated, false);
-    if (updateResult.status === "applied" && updateResult.server !== null) {
+    if (
+      updateResult.status === "applied" &&
+      updateResult.server !== null &&
+      updateResult.server !== undefined
+    ) {
       const task = updateResult.server;
       if (task.status === "DONE" || task.status === "CANCELLED") {
         await this.reminders.cancelTask(task.id);

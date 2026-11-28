@@ -10,7 +10,6 @@ import {
   type RegisterDevice,
   type Task,
   type UpdateDevice,
-  type UpdateNotificationPreferences,
 } from "@focus/contracts";
 import { DomainError } from "../../common/domain-error";
 import { describeIssues } from "../../common/zod-issues";

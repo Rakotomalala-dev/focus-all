@@ -3,6 +3,8 @@ import type { AuthContext } from "../auth/auth-context";
 import { DomainError } from "../../common/domain-error";
 import { InMemoryTaskRepository, type StoredTask } from "./task.repository";
 import type { ProjectRepository } from "../projects/project.repository";
+import { InMemoryReminderRepository } from "../reminders/reminder.repository";
+import { RemindersService } from "../reminders/reminders.service";
 import type { TagRepository } from "../tags/tag.repository";
 import { TasksService } from "./tasks.service";
 
@@ -39,6 +41,7 @@ function storedTask(id: string, workspaceId: string, sortOrder: string): StoredT
     updatedAt: TIMESTAMP,
     tagIds: [],
     reminders: [],
+    reminderOffsets: [],
     recurrenceMode: "FIXED",
   };
 }
@@ -49,7 +52,14 @@ function setup(): { service: TasksService; repository: InMemoryTaskRepository } 
     storedTask(FOREIGN_TASK_ID, OTHER_WORKSPACE_ID, "000002"),
   ]);
   return {
-    service: new TasksService(repository, {} as TagRepository, {} as ProjectRepository),
+    service: new TasksService(
+      repository,
+      {} as TagRepository,
+      {} as ProjectRepository,
+      new RemindersService(new InMemoryReminderRepository(), {
+        send: async () => undefined,
+      }),
+    ),
     repository,
   };
 }

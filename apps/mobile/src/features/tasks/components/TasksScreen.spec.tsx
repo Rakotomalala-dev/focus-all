@@ -55,6 +55,7 @@ const TASK: Task = {
   priority: "HIGH",
   tagIds: [],
   reminders: [],
+  reminderOffsets: [],
   recurrenceMode: "FIXED",
   status: "TODO",
   completedAt: null,

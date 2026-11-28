@@ -129,6 +129,40 @@
       "delete": "Permanently delete my account"
     }
   },
+  "notifications": {
+    "title": "Notifications",
+    "hint": "Reminders on time, moved out of your quiet hours.",
+    "channel": "Reminders",
+    "body": "A task is due soon.",
+    "postponed": "Postponed reminder",
+    "loading": "Loading notification preferences…",
+    "error": "Notification preferences could not be loaded.",
+    "retry": "Try again",
+    "saved": "Preferences saved.",
+    "schedulingFailed": "Local notifications could not be scheduled.",
+    "categories": {
+      "title": "Categories",
+      "reminders": "Reminders",
+      "dailySummary": "Daily summary",
+      "collaboration": "Collaboration"
+    },
+    "quiet": {
+      "title": "Quiet hours",
+      "enable": "Enable quiet hours",
+      "start": "Start",
+      "end": "End",
+      "save": "Save quiet hours",
+      "invalid": "Use the HH:MM format with two different times."
+    },
+    "device": {
+      "title": "This device",
+      "enable": "Receive notifications on this device",
+      "empty": "This device is not registered for notifications yet.",
+      "activate": "Enable notifications",
+      "web": "Notifications are only available on Android in the MVP.",
+      "error": "The device could not be registered."
+    }
+  },
   "offline": {
     "title": "Offline data",
     "hint": "Your recent tasks, projects and tags stay available without a network.",
@@ -339,7 +373,8 @@
         "project": "Project",
         "estimate": "Estimate (minutes)",
         "tags": "Tags",
-        "reminders": "Reminders"
+        "reminders": "Reminders",
+        "reminderOffsets": "Reminders relative to the due date"
       },
       "inbox": "Inbox",
       "richTextHint": "Limited Markdown: **bold**, *italic*, - lists, - [ ] checkboxes, [link](url).",
@@ -349,6 +384,15 @@
       "reminderDate": "Reminder date",
       "reminderTime": "Reminder time",
       "addReminder": "Add reminder",
+      "reminderLimit": "Five reminders maximum per task.",
+      "offsets": {
+        "o0": "At due time",
+        "o5": "5 min before",
+        "o15": "15 min before",
+        "o30": "30 min before",
+        "o60": "1 h before",
+        "o1440": "1 day before"
+      },
       "recurrenceInterval": "Every N periods",
       "recurrenceRule": "RFC 5545 RRULE",
       "subtasks": {

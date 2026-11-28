@@ -52,6 +52,7 @@ const TASK: Task = {
   priority: "HIGH",
   tagIds: [],
   reminders: [],
+  reminderOffsets: [],
   recurrenceMode: "FIXED",
   status: "TODO",
   completedAt: null,
@@ -116,6 +117,7 @@ describe("TaskDetailScreen", () => {
             estimateMinutes: null,
             tagIds: [],
             reminders: [],
+            reminderOffsets: [],
             recurrenceRule: null,
             recurrenceMode: "FIXED",
           },
@@ -124,6 +126,24 @@ describe("TaskDetailScreen", () => {
       );
     });
     expect(mocks.back).toHaveBeenCalledTimes(1);
+  });
+
+  it("enregistre un rappel relatif à l'échéance (RF-50)", async () => {
+    mocks.useTask.mockReturnValue({ status: "success", data: TASK });
+
+    render(<TaskDetailScreen taskId={TASK.id} />);
+
+    fireEvent.press(screen.getByLabelText("15 min avant"));
+    fireEvent.press(screen.getByLabelText("Enregistrer"));
+
+    await waitFor(() => {
+      expect(mocks.updateMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          patch: expect.objectContaining({ reminderOffsets: [15] }),
+        }),
+        expect.anything(),
+      );
+    });
   });
 
   it("refuse une échéance mal formée sans appeler le serveur", async () => {

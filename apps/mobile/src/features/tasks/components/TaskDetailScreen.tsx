@@ -1,5 +1,7 @@
 import {
   MAX_SUBTASKS,
+  MAX_TASK_REMINDERS,
+  REMINDER_OFFSET_PRESETS,
   TASK_PRIORITIES,
   TASK_STATUSES,
   hhmmSchema,
@@ -127,6 +129,7 @@ function TaskEditForm({ task }: { readonly task: Task }) {
   const [tagIds, setTagIds] = useState<string[]>(task.tagIds);
   const [newTag, setNewTag] = useState("");
   const [reminders, setReminders] = useState<string[]>(task.reminders);
+  const [reminderOffsets, setReminderOffsets] = useState<number[]>(task.reminderOffsets);
   const [reminderDate, setReminderDate] = useState("");
   const [reminderTime, setReminderTime] = useState("");
   const [recurrencePreset, setRecurrencePreset] = useState<RecurrencePreset>(
@@ -179,6 +182,7 @@ function TaskEditForm({ task }: { readonly task: Task }) {
           : Math.round(minutes),
       tagIds,
       reminders,
+      reminderOffsets,
       recurrenceRule: recurrenceRule.length === 0 ? null : recurrenceRule,
       recurrenceMode,
     };
@@ -205,9 +209,29 @@ function TaskEditForm({ task }: { readonly task: Task }) {
     if (reminderDate.length === 0 || reminderTime.length === 0) return;
     const date = new Date(`${reminderDate}T${reminderTime}:00`);
     if (Number.isNaN(date.getTime())) return;
+    if (reminders.length + reminderOffsets.length >= MAX_TASK_REMINDERS) {
+      setLocalError(t("tasks.detail.reminderLimit"));
+      return;
+    }
     setReminders((current) => [...new Set([...current, date.toISOString()])]);
     setReminderDate("");
     setReminderTime("");
+  }
+
+  // RF-50 : rappels relatifs à l'échéance (5/15/30 min, 1 h, 1 j), dans la
+  // limite de cinq rappels absolus et relatifs confondus.
+  function toggleReminderOffset(offset: number): void {
+    setReminderOffsets((current) => {
+      if (current.includes(offset)) {
+        return current.filter((value) => value !== offset);
+      }
+      if (reminders.length + current.length >= MAX_TASK_REMINDERS) {
+        setLocalError(t("tasks.detail.reminderLimit"));
+        return current;
+      }
+      setLocalError(null);
+      return [...current, offset];
+    });
   }
 
   async function addSubtask(): Promise<void> {
@@ -344,6 +368,18 @@ function TaskEditForm({ task }: { readonly task: Task }) {
           <Field label={t("tasks.detail.reminderDate")} value={reminderDate} onChangeText={setReminderDate} placeholder="2026-11-30" />
           <Field label={t("tasks.detail.reminderTime")} value={reminderTime} onChangeText={setReminderTime} placeholder="08:00" />
           <Button label={t("tasks.detail.addReminder")} onPress={addReminder} />
+        </View>
+
+        <AppText tone="muted">{t("tasks.detail.fields.reminderOffsets")}</AppText>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.xs }}>
+          {REMINDER_OFFSET_PRESETS.map((offset) => (
+            <Choice
+              key={offset}
+              label={t(`tasks.detail.offsets.o${offset}`)}
+              selected={reminderOffsets.includes(offset)}
+              onPress={() => toggleReminderOffset(offset)}
+            />
+          ))}
         </View>
 
         <AppText tone="muted">{t("tasks.detail.fields.recurrence")}</AppText>

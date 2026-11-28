@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import type {
   Device,
   DevicePlatform,
@@ -93,7 +93,7 @@ function toDelivery(row: DeliveryRow): StoredDelivery {
 
 @Injectable()
 export class PrismaReminderRepository implements ReminderRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async userContext(userId: string): Promise<UserNotificationContext> {
     const user = await this.prisma.user.findUnique({

@@ -17,7 +17,7 @@ const config: ExpoConfig = {
     // Servi plus tard avec un fallback SPA (doc 03 §7.2).
     name: "Focus",
   },
-  plugins: ["expo-router", "expo-secure-store"],
+  plugins: ["expo-router", "expo-secure-store", "expo-notifications"],
   experiments: { typedRoutes: true },
 };
 

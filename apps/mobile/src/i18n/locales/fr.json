@@ -129,6 +129,40 @@
       "delete": "Supprimer définitivement mon compte"
     }
   },
+  "notifications": {
+    "title": "Notifications",
+    "hint": "Rappels à l'heure, décalés hors de votre plage silencieuse.",
+    "channel": "Rappels",
+    "body": "Une tâche arrive à échéance.",
+    "postponed": "Rappel reporté",
+    "loading": "Chargement des préférences…",
+    "error": "Les préférences de notifications n'ont pas pu être chargées.",
+    "retry": "Réessayer",
+    "saved": "Préférences enregistrées.",
+    "schedulingFailed": "Les notifications locales n'ont pas pu être planifiées.",
+    "categories": {
+      "title": "Catégories",
+      "reminders": "Rappels",
+      "dailySummary": "Résumé quotidien",
+      "collaboration": "Collaboration"
+    },
+    "quiet": {
+      "title": "Plage silencieuse",
+      "enable": "Activer la plage silencieuse",
+      "start": "Début",
+      "end": "Fin",
+      "save": "Enregistrer la plage",
+      "invalid": "Utilisez le format HH:MM et deux heures différentes."
+    },
+    "device": {
+      "title": "Cet appareil",
+      "enable": "Recevoir les notifications sur cet appareil",
+      "empty": "Cet appareil n'est pas encore enregistré pour les notifications.",
+      "activate": "Activer les notifications",
+      "web": "Les notifications ne sont disponibles que sur Android au MVP.",
+      "error": "L'appareil n'a pas pu être enregistré."
+    }
+  },
   "offline": {
     "title": "Données hors ligne",
     "hint": "Vos tâches, projets et tags récents restent consultables sans réseau.",
@@ -339,7 +373,8 @@
         "project": "Projet",
         "estimate": "Estimation (minutes)",
         "tags": "Tags",
-        "reminders": "Rappels"
+        "reminders": "Rappels",
+        "reminderOffsets": "Rappels relatifs à l'échéance"
       },
       "inbox": "Inbox",
       "richTextHint": "Markdown limité : **gras**, *italique*, - listes, - [ ] cases, [lien](url).",
@@ -349,6 +384,15 @@
       "reminderDate": "Date du rappel",
       "reminderTime": "Heure du rappel",
       "addReminder": "Ajouter le rappel",
+      "reminderLimit": "Cinq rappels au maximum par tâche.",
+      "offsets": {
+        "o0": "À l'heure",
+        "o5": "5 min avant",
+        "o15": "15 min avant",
+        "o30": "30 min avant",
+        "o60": "1 h avant",
+        "o1440": "1 j avant"
+      },
       "recurrenceInterval": "Toutes les N périodes",
       "recurrenceRule": "RRULE RFC 5545",
       "subtasks": {

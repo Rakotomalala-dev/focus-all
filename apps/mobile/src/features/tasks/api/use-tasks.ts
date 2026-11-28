@@ -5,11 +5,34 @@ import type {
   TaskStatus,
 } from "@focus/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNotificationStore } from "../../../data/notifications/notification-store";
+import { reminderSync } from "../../../data/notifications/reminder-sync-instance";
 import { taskRepository } from "../../../data/tasks/task-repository-instance";
 import type { TaskPatchInput } from "../../../data/tasks/task-repository";
 
 // Une mutation n'invalide que les listes de tâches, jamais tout le cache (ADR-007).
 const TASK_LIST_KEY = ["tasks", "list"] as const;
+
+// RF-50 : la notification locale suit l'état confirmé par le serveur. Un échec
+// de planification est publié dans le store (affiché dans les réglages) sans
+// transformer une mutation réussie en erreur.
+async function syncLocalReminders(task: Task): Promise<void> {
+  try {
+    await reminderSync.syncTask(task);
+    useNotificationStore.getState().setSchedulingFailed(false);
+  } catch {
+    useNotificationStore.getState().setSchedulingFailed(true);
+  }
+}
+
+async function cancelLocalReminders(taskId: string): Promise<void> {
+  try {
+    await reminderSync.cancelTask(taskId);
+    useNotificationStore.getState().setSchedulingFailed(false);
+  } catch {
+    useNotificationStore.getState().setSchedulingFailed(true);
+  }
+}
 
 export function useTasks(query: TaskListQuery = { limit: 100, sort: "MANUAL" }) {
   return useQuery({
@@ -29,8 +52,9 @@ export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (draft: TaskDraftInput) => taskRepository.create(draft),
-    onSuccess: async () => {
+    onSuccess: async (task) => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await syncLocalReminders(task);
     },
   });
 }
@@ -40,8 +64,9 @@ export function useUpdateTask() {
   return useMutation({
     mutationFn: ({ task, patch }: { readonly task: Task; readonly patch: TaskPatchInput }) =>
       taskRepository.update(task, patch),
-    onSuccess: async () => {
+    onSuccess: async (task) => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await syncLocalReminders(task);
     },
   });
 }
@@ -51,8 +76,9 @@ export function useSetTaskStatus() {
   return useMutation({
     mutationFn: ({ task, status }: { readonly task: Task; readonly status: TaskStatus }) =>
       taskRepository.setStatus(task, status),
-    onSuccess: async () => {
+    onSuccess: async (task) => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await syncLocalReminders(task);
     },
   });
 }
@@ -61,8 +87,9 @@ export function useDeleteTask() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (task: Task) => taskRepository.remove(task),
-    onSuccess: async () => {
+    onSuccess: async (_result, task) => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await cancelLocalReminders(task.id);
     },
   });
 }
@@ -98,8 +125,9 @@ export function useRestoreTask() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => taskRepository.restore(id),
-    onSuccess: async () => {
+    onSuccess: async (task) => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await syncLocalReminders(task);
     },
   });
 }

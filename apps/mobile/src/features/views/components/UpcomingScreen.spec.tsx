@@ -25,6 +25,7 @@ const BASE_TASK: Task = {
   priority: "MEDIUM",
   tagIds: [],
   reminders: [],
+  reminderOffsets: [],
   recurrenceMode: "FIXED",
   status: "TODO",
   completedAt: null,
