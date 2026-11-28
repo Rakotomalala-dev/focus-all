@@ -399,5 +399,14 @@ describe("RF-06 — export et suppression de compte", () => {
     });
     expect(cannotLogin.status).toBe(401);
     expect((await refresh(tokens.refreshToken)).status).toBe(401);
+
+    // RF-06 : le job purge physiquement le compte après 30 jours ; l'e-mail
+    // redevient alors disponible (la cascade efface workspaces et tâches).
+    const purged = await api.purgeAccounts(
+      new Date(Date.now() + 31 * 24 * 60 * 60 * 1000),
+    );
+    expect(purged).toBeGreaterThanOrEqual(1);
+    const registeredAgain = await register(email);
+    expect(registeredAgain.accessToken.length).toBeGreaterThan(0);
   });
 });

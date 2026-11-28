@@ -2,6 +2,12 @@ import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { AppConfigModule, APP_ENV } from "../../config/app-config.module";
 import type { Env } from "../../config/env.schema";
+import {
+  ACCOUNT_PURGE_STORE,
+  AccountPurgeService,
+  AccountPurgeWorker,
+  PrismaAccountPurgeStore,
+} from "./account-purge.service";
 import { AuthController, MeController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { MAILER, SmtpMailer } from "./mailer";
@@ -36,6 +42,9 @@ import { PasswordHasher } from "./password-hasher";
   controllers: [AuthController, MeController],
   providers: [
     AuthService,
+    AccountPurgeService,
+    AccountPurgeWorker,
+    { provide: ACCOUNT_PURGE_STORE, useClass: PrismaAccountPurgeStore },
     PasswordHasher,
     // Port de livraison remplaçable en test par une boîte mémoire.
     { provide: MAILER, useClass: SmtpMailer },

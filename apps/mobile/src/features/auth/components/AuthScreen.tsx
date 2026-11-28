@@ -9,6 +9,7 @@ import {
   appErrorMessageKey,
   type AppErrorMessageKey,
 } from "../../../data/http/app-error";
+import { detectTimezone } from "../../../data/device/timezone";
 import { useLogin, useRegister, useRequestPasswordReset } from "../api/use-auth";
 
 type AuthMode = "login" | "register" | "forgot";
@@ -78,10 +79,12 @@ export function AuthScreen() {
     }
 
     const displayName = values.displayName.trim();
+    const timezone = detectTimezone();
     const parsed = registerInputSchema.safeParse({
       email: values.email,
       password: values.password,
       ...(displayName.length === 0 ? {} : { displayName }),
+      ...(timezone === undefined ? {} : { timezone }),
     });
     if (!parsed.success) {
       setValidationKey("auth.errors.validation");

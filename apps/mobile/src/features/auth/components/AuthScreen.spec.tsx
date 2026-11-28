@@ -4,6 +4,10 @@ import { AppError } from "../../../data/http/app-error";
 import "../../../i18n";
 import { AuthScreen } from "./AuthScreen";
 
+vi.mock("../../../data/device/timezone", () => ({
+  detectTimezone: () => "Europe/Paris",
+}));
+
 const mocks = vi.hoisted(() => ({
   loginMutateAsync: vi.fn(),
   registerMutateAsync: vi.fn(),
@@ -131,6 +135,7 @@ describe("AuthScreen", () => {
         email: "ada@focus.local",
         password: "motdepasse-solide",
         displayName: "Ada",
+        timezone: "Europe/Paris",
       });
     });
   });

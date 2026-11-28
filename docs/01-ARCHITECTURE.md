@@ -730,7 +730,7 @@ erDiagram
 
 | Convention | Règle |
 |---|---|
-| Suppression | **Soft delete** (`deletedAt`) sur `Task` et `Project` ; purge définitive après **30 jours** (`pnpm --filter @focus/api db:purge`). Le soft delete produit un `SyncChange` de type `DELETE` (tombstone). |
+| Suppression | **Soft delete** (`deletedAt`) sur `Task` et `Project` ; purge définitive après **30 jours** par le job quotidien `AccountPurgeWorker` (au démarrage puis toutes les 24 h), avec `pnpm --filter @focus/api db:purge` comme repli pour un ordonnanceur externe. Le soft delete produit un `SyncChange` de type `DELETE` (tombstone). |
 | Ordre | `sortOrder numeric` (pas `integer`) : insertion entre deux éléments = moyenne des voisins ; renormalisation périodique par job. |
 | Multi-tenant | Toute table métier porte `workspaceId` (dénormalisé même quand `projectId` suffirait) pour permettre les index et les requêtes de sync par workspace |
 | Index | `(workspaceId, deletedAt)`, `(workspaceId, projectId, status, sortOrder)`, `(workspaceId, dueDate)`, GIN sur `searchVector` alimenté par `focus_unaccent(title || ' ' || coalesce(description,''))` |
