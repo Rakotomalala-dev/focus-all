@@ -5,7 +5,7 @@
 > **Public :** développeurs, DevOps, QA, agents IA contributeurs
 > **Documents liés :** [01-ARCHITECTURE.md](./01-ARCHITECTURE.md) · [02-CAHIER-DES-CHARGES.md](./02-CAHIER-DES-CHARGES.md) · [04-BEST-PRACTICES.md](./04-BEST-PRACTICES.md) · [05-SKILLS-AND-TOOLS.md](./05-SKILLS-AND-TOOLS.md)
 
-> **Avertissement d'état (2026-11-28).** Le socle **M0** et les domaines **Compte et sécurité**, **Tâches et projets**, **Vues**, **Rappels** et **Consultation hors ligne** de M1 sont implémentés : monorepo pnpm + Turborepo, API NestJS/Fastify avec Prisma, authentification complète, CRUD projets (couleurs, archivage lecture seule, ordre fractionnaire, corbeille), CRUD tâches (sous-tâches, statuts, priorités, échéances et heures, tags, recherche plein texte, rappels absolus et relatifs, récurrence, corbeille), Inbox et filtres combinables, protocole de sync, rappels locaux Android + Expo Push et miroir SQLite en lecture, avec l'app Expo correspondante. Redis/BullMQ, les pièces jointes, l'écriture hors ligne et le temps réel restent à implémenter : les sections correspondantes décrivent la **cible**.
+> **Avertissement d'état (2026-11-28).** Le socle **M0** et les domaines **Compte et sécurité**, **Tâches et projets**, **Vues**, **Rappels** et **Consultation hors ligne** de M1 sont implémentés : monorepo pnpm + Turborepo, API NestJS/Fastify avec Prisma, authentification complète, CRUD projets (couleurs, archivage lecture seule, ordre fractionnaire, corbeille), CRUD tâches (sous-tâches, statuts, priorités, échéances et heures, tags, recherche plein texte, rappels absolus et relatifs, récurrence, corbeille), Inbox et filtres combinables, protocole de sync, rappels locaux Android + Expo Push et miroir SQLite en lecture, avec l'app Expo correspondante. Redis/BullMQ, les pièces jointes, l'écriture hors ligne (RF-62) et la collaboration temps réel (RF-63/RF-80) restent à implémenter : les sections correspondantes décrivent la **cible**. La synchronisation multi-appareils RF-60 est assurée par pull incrémental en foreground.
 >
 > Vérifications **réellement exécutées** sur ce dépôt : `pnpm install` (lockfile `9.0`), `pnpm typecheck` (2 tâches, code 0), `pnpm lint` (0 avertissement, code 0), `pnpm test` (1 fichier, 2 tests passés, code 0), `pnpm --filter @focus/api build` (code 0), API démarrée puis `GET /health` et `GET /health/ready` → `200` (`database`/`redis` = `not_configured`), et `pnpm --filter @focus/mobile build:web` → `Exported: dist`, 3 routes statiques, code 0.
 >
@@ -771,8 +771,9 @@ Le client conserve une copie en lecture des tâches, projets et tags (RF-61) et 
 | Écriture | Hors périmètre M1 : les mutations restent en ligne (RF-62, V1.1). |
 | Bandeau | `ConnectionBanner` affiche en ligne/hors ligne, la dernière synchronisation, la synchronisation en cours et son échec. |
 | Réinitialisation | Réglages → « Réinitialiser les données locales » : vide la copie et le curseur, conserve `deviceId` (et l'outbox si elle existe), puis force un instantané complet. |
+| Propagation | RF-60 : en session et en ligne, un pull incrémental `/sync/pull` toutes les 2 s applique les `SyncChange` au miroir (UPSERT/DELETE), avance le curseur puis invalide `tasks`, `projects`, `tags`, `views` et l'état hors ligne. Aucun polling en arrière-plan ; le p95 cible est < 5 s. |
 
-Code : `apps/mobile/src/data/offline/*`, `apps/mobile/src/features/offline/*`. Vérifications : `pnpm --filter @focus/mobile test` et `pnpm --filter @focus/mobile typecheck`.
+Code : `apps/mobile/src/data/offline/*` (`sync-watcher.ts` pour RF-60), `apps/mobile/src/features/offline/*`. Vérifications : `pnpm --filter @focus/mobile test` et `pnpm --filter @focus/mobile typecheck` ; `sync-watcher.spec.ts` couvre UPSERT, DELETE, pagination et payload illisible, `offline-store.spec.ts` l'application du journal et l'avancement du curseur.
 
 ### 6.4 Conventions d'erreur et de validation
 

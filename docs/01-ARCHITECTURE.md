@@ -945,8 +945,8 @@ Règles :
 
 - Le curseur est **monotone** (id `bigserial`), propre à chaque workspace, jamais à un utilisateur.
 - Un client qui présente un curseur plus ancien que la rétention du journal (90 jours) reçoit `410 SYNC_CURSOR_EXPIRED` ; il doit alors appeler `/sync/snapshot` et remplacer sa base locale (les mutations en attente sont rejouées ensuite).
-- Déclencheurs de pull : démarrage à froid, retour au premier plan, reconnexion réseau, toutes les 60 s en foreground, après un push réussi.
-- Aucun polling en arrière-plan : les rappels sont locaux ou poussés, pas synchronisés en boucle.
+- Déclencheurs de pull : démarrage à froid, retour au premier plan, reconnexion réseau, après un push réussi et **toutes les 2 s en foreground** (RF-60, p95 < 5 s). Le lot est appliqué au miroir local puis les queries TanStack concernées sont invalidées.
+- Aucun polling en arrière-plan : les rappels sont locaux ou poussés, pas synchronisés en boucle. Le WebSocket de collaboration reste une cible V1.3 ; la synchronisation multi-appareils M1 utilise le journal et le pull incrémental.
 
 ### 11.4 Résolution de conflits
 

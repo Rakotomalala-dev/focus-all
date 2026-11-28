@@ -142,6 +142,50 @@ describe("offlineStore", () => {
     expect(await store.readTasks()).toHaveLength(1);
   });
 
+  it("applique les changements du journal et avance le curseur (RF-60)", async () => {
+    const store = createOfflineStore(createMemoryStoragePort());
+    await store.saveSnapshot({
+      tasks: [TASK_A],
+      projects: [],
+      tags: [],
+      cursor: 10,
+      syncedAt: SYNCED_AT,
+    });
+
+    const applied = await store.applySyncChanges(
+      [
+        {
+          cursor: 11,
+          entityType: "task",
+          entityId: TASK_B.id,
+          operation: "UPSERT",
+          version: 1,
+          payload: TASK_B,
+          actorId: null,
+          changedAt: "2026-11-28T10:00:01.000Z",
+        },
+        {
+          cursor: 12,
+          entityType: "task",
+          entityId: TASK_A.id,
+          operation: "DELETE",
+          version: 2,
+          payload: { id: TASK_A.id },
+          actorId: null,
+          changedAt: "2026-11-28T10:00:02.000Z",
+        },
+      ],
+      "2026-11-28T10:00:03.000Z",
+    );
+
+    expect(applied).toBe(2);
+    expect((await store.readTasks()).map((task) => task.id)).toEqual([TASK_B.id]);
+    expect(await store.readStatus()).toMatchObject({
+      cursor: 12,
+      lastSyncAt: "2026-11-28T10:00:03.000Z",
+    });
+  });
+
   it("vide le miroir et le curseur mais conserve l'identifiant d'appareil", async () => {
     const port = createMemoryStoragePort();
     const store = createOfflineStore(port);

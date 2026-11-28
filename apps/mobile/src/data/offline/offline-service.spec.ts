@@ -54,6 +54,7 @@ function buildService(options: {
   const store = options.store ?? createOfflineStore(createMemoryStoragePort());
   const sync = {
     snapshot: vi.fn(async () => syncSnapshotResponseSchema.parse(await options.snapshot())),
+    pull: vi.fn(async () => ({ changes: [], nextCursor: 0, hasMore: false })),
   };
   const projects = { list: vi.fn(options.projects ?? (async () => [PROJECT] as const)) };
   const tags = { list: vi.fn(options.tags ?? (async () => [TAG] as const)) };

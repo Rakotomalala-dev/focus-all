@@ -7,6 +7,12 @@ import {
   resetOfflineState,
   synchronizeOfflineState,
 } from "../../../data/offline/offline-service-instance";
+import { offlineStore } from "../../../data/offline/offline-store-instance";
+import { syncClient } from "../../../data/offline/sync-client";
+import {
+  SYNC_POLL_INTERVAL_MS,
+  pullRemoteChanges,
+} from "../../../data/offline/sync-watcher";
 
 export const OFFLINE_STATUS_KEY = ["offline", "status"] as const;
 
@@ -52,6 +58,55 @@ export function useOfflineSync(): void {
         void queryClient.invalidateQueries({ queryKey: OFFLINE_STATUS_KEY });
       }
     });
+  }, [isOnline, queryClient, sessionStatus]);
+
+  // RF-60 : sans action manuelle, un second appareil reçoit les mutations
+  // confirmées via un pull incrémental toutes les 2 s (p95 < 5 s).
+  useEffect(() => {
+    if (sessionStatus !== "signedIn" || !isOnline) return;
+
+    let active = true;
+    let inFlight = false;
+
+    const tick = async (): Promise<void> => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const outcome = await pullRemoteChanges({
+          store: offlineStore,
+          sync: syncClient,
+          now: () => new Date(),
+        });
+        if (!active) return;
+        if (outcome.changed) {
+          useConnectionStore.getState().setLastSyncAt(outcome.syncedAt);
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+            queryClient.invalidateQueries({ queryKey: ["projects"] }),
+            queryClient.invalidateQueries({ queryKey: ["tags"] }),
+            queryClient.invalidateQueries({ queryKey: ["views"] }),
+            queryClient.invalidateQueries({ queryKey: OFFLINE_STATUS_KEY }),
+          ]);
+        }
+        useConnectionStore.getState().setSyncStatus("idle");
+      } catch {
+        if (active) {
+          useConnectionStore.getState().setSyncStatus("error");
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void tick();
+    const timer = setInterval(() => {
+      void tick();
+    }, SYNC_POLL_INTERVAL_MS);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, [isOnline, queryClient, sessionStatus]);
 }
 

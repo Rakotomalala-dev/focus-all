@@ -3,6 +3,7 @@ import {
   tagSchema,
   taskSchema,
   type Project,
+  type SyncChange,
   type Tag,
   type Task,
 } from "@focus/contracts";
@@ -40,6 +41,11 @@ export type OfflineStore = {
   readonly saveSnapshot: (snapshot: OfflineSnapshotInput) => Promise<void>;
   readonly saveTasks: (tasks: readonly Task[]) => Promise<void>;
   readonly removeTasks: (ids: readonly string[]) => Promise<void>;
+  // RF-60 : applique un lot de `/sync/pull` au miroir et avance le curseur.
+  readonly applySyncChanges: (
+    changes: readonly SyncChange[],
+    syncedAt: string,
+  ) => Promise<number>;
   readonly readTasks: () => Promise<readonly Task[]>;
   readonly findTask: (id: string) => Promise<Task | null>;
   readonly saveProjects: (projects: readonly Project[]) => Promise<void>;
@@ -124,6 +130,35 @@ export function createOfflineStore(port: OfflineStoragePort): OfflineStore {
 
     removeTasks: async (ids) => {
       await port.deleteEntities("tasks", ids);
+    },
+
+    applySyncChanges: async (changes, syncedAt) => {
+      const tasks: Task[] = [];
+      const removed: string[] = [];
+      for (const change of changes) {
+        if (change.operation === "DELETE") {
+          removed.push(change.entityId);
+          continue;
+        }
+        const parsed = taskSchema.safeParse(change.payload);
+        // Un payload illisible est ignoré : le prochain instantané complet
+        // répare la copie, tandis que le curseur avance pour ne pas boucler.
+        if (parsed.success) {
+          tasks.push(parsed.data);
+        }
+      }
+      if (tasks.length > 0) {
+        await port.upsertEntities("tasks", serialize(tasks));
+      }
+      if (removed.length > 0) {
+        await port.deleteEntities("tasks", removed);
+      }
+      const last = changes.at(-1);
+      if (last !== undefined) {
+        await writeMeta("cursor", String(last.cursor));
+        await writeMeta("lastSyncAt", syncedAt);
+      }
+      return tasks.length + removed.length;
     },
 
     readTasks: () => readCollection("tasks", taskSchema),
