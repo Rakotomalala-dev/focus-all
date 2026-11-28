@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "../../../i18n";
 import { SettingsScreen } from "./SettingsScreen";
@@ -10,6 +10,15 @@ const mocks = vi.hoisted(() => ({
   updateMutate: vi.fn(),
   changeMutate: vi.fn(),
   deleteMutate: vi.fn(),
+  requestExport: vi.fn(),
+  exportJobData: null as null | {
+    id: string;
+    status: "PENDING" | "PROCESSING" | "READY" | "FAILED" | "EXPIRED";
+    createdAt: string;
+    completedAt: string | null;
+    expiresAt: string | null;
+    downloadUrl: string | null;
+  },
 }));
 
 vi.mock("expo-router", () => ({
@@ -37,6 +46,7 @@ vi.mock("../../auth/api/use-auth", () => ({
       timeFormat: "H24",
       theme: "SYSTEM",
       quickAddParsingEnabled: true,
+      telemetryEnabled: false,
       workspaces: [],
     },
   }),
@@ -99,7 +109,24 @@ vi.mock("../api/use-settings", () => ({
   }),
   useRevokeSession: () => ({ mutate: mocks.revoke, isPending: false }),
   useRevokeAllSessions: () => ({ mutate: mocks.revokeAll, isPending: false }),
-  useExportAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useRequestExport: () => ({
+    mutateAsync: mocks.requestExport,
+    isPending: false,
+    isError: false,
+  }),
+  useExportJob: (id: string | null) => ({
+    data:
+      id === null
+        ? null
+        : (mocks.exportJobData ?? {
+            id,
+            status: "PENDING",
+            createdAt: "2026-11-28T10:00:00.000Z",
+            completedAt: null,
+            expiresAt: null,
+            downloadUrl: null,
+          }),
+  }),
 }));
 
 describe("SettingsScreen", () => {
@@ -110,6 +137,16 @@ describe("SettingsScreen", () => {
     mocks.updateMutate.mockReset();
     mocks.changeMutate.mockReset();
     mocks.deleteMutate.mockReset();
+    mocks.requestExport.mockReset();
+    mocks.exportJobData = null;
+    mocks.requestExport.mockResolvedValue({
+      id: "018f3b3c-1a2b-7c3d-8e4f-0a1b2c3d4eb1",
+      status: "PENDING",
+      createdAt: "2026-11-28T10:00:00.000Z",
+      completedAt: null,
+      expiresAt: null,
+      downloadUrl: null,
+    });
   });
 
   it("affiche le profil, les préférences et les sessions actives", () => {
@@ -129,6 +166,25 @@ describe("SettingsScreen", () => {
     fireEvent.press(screen.getByLabelText("Révoquer cette session"));
 
     expect(mocks.revoke).toHaveBeenCalledWith("session-1");
+  });
+
+  it("active la télémétrie anonyme explicitement", () => {
+    render(<SettingsScreen />);
+
+    fireEvent.press(screen.getByLabelText("Télémétrie anonyme: Activé"));
+
+    expect(mocks.updateMutate).toHaveBeenCalledWith({ telemetryEnabled: true });
+  });
+
+  it("lance un export asynchrone et affiche la préparation", async () => {
+    render(<SettingsScreen />);
+
+    fireEvent.press(screen.getByLabelText("Exporter mes données"));
+
+    await waitFor(() => {
+      expect(mocks.requestExport).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Export en préparation. Le lien sera valable 24 h.")).toBeTruthy();
+    });
   });
 
   it("exige le littéral DELETE avant d'activer la suppression", () => {

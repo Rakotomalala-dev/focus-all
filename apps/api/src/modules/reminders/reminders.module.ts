@@ -17,6 +17,6 @@ import { RemindersWorker } from "./reminders.worker";
     { provide: PUSH_SENDER, useClass: ExpoPushSender },
   ],
   // Les tâches replanifient leurs rappels après chaque écriture (RF-50).
-  exports: [RemindersService],
+  exports: [RemindersService, PUSH_SENDER],
 })
 export class RemindersModule {}

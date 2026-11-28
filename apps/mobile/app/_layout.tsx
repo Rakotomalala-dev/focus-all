@@ -10,6 +10,7 @@ import { hydrateSession } from "../src/data/auth/auth-service";
 import { useSessionStore } from "../src/data/auth/session-store";
 import { startConnectionWatcher } from "../src/data/offline/connection-store";
 import { queryClient } from "../src/data/query-client";
+import { trackTelemetry } from "../src/data/telemetry/telemetry";
 import { ConnectionBanner, useOfflineSync } from "../src/features/offline";
 
 // Le bootstrap hors ligne vit sous le QueryClientProvider : il publie l'état
@@ -22,6 +23,9 @@ function OfflineBridge() {
 export default function RootLayout() {
   const { t } = useTranslation();
   const theme = useSessionStore((state) => state.user?.theme ?? "SYSTEM");
+  const telemetryEnabled = useSessionStore(
+    (state) => state.user?.telemetryEnabled ?? false,
+  );
   const hydrationStarted = useRef(false);
 
   useEffect(() => {
@@ -33,6 +37,12 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => startConnectionWatcher(), []);
+
+  useEffect(() => {
+    if (telemetryEnabled) {
+      void trackTelemetry("app_open");
+    }
+  }, [telemetryEnabled]);
 
   return (
     <QueryClientProvider client={queryClient}>

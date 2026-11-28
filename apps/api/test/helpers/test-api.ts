@@ -3,6 +3,7 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import { Test } from "@nestjs/testing";
 import { PrismaClient } from "@prisma/client";
 import { AppModule } from "../../src/app.module";
+import { ExportService } from "../../src/modules/exports/export.service";
 import { APP_ENV } from "../../src/config/app-config.module";
 import type { Env } from "../../src/config/env.schema";
 import { applyHttpConfig } from "../../src/config/http";
@@ -57,6 +58,8 @@ export type TestApi = {
   // Boîte mémoire : les tests de réinitialisation lisent le lien envoyé sans
   // dépendre d'un serveur SMTP.
   readonly mailbox: TestMailbox;
+  // Traite la file d'exports sans attendre le timer de 30 s (RF-71).
+  readonly processExports: () => Promise<number>;
   readonly close: () => Promise<void>;
 };
 
@@ -132,6 +135,7 @@ export async function startTestApi(): Promise<TestApi> {
   const env = app.get<Env>(APP_ENV);
 
   const prisma = new PrismaClient();
+  const exportService = app.get(ExportService);
   const workspaceIds: string[] = [];
   const userIds: string[] = [];
 
@@ -222,5 +226,13 @@ export async function startTestApi(): Promise<TestApi> {
     await app.close();
   }
 
-  return { request, bearerToken, createWorkspace, deleteAccount, mailbox, close };
+  return {
+    request,
+    bearerToken,
+    createWorkspace,
+    deleteAccount,
+    mailbox,
+    processExports: () => exportService.processPending(),
+    close,
+  };
 }

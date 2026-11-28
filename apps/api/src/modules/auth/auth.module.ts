@@ -40,6 +40,6 @@ import { PasswordHasher } from "./password-hasher";
     // Port de livraison remplaçable en test par une boîte mémoire.
     { provide: MAILER, useClass: SmtpMailer },
   ],
-  exports: [JwtModule],
+  exports: [JwtModule, AuthService],
 })
 export class AuthModule {}

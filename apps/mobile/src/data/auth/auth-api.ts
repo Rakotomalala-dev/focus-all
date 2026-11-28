@@ -1,6 +1,6 @@
 import {
-  accountExportSchema,
   authTokensSchema,
+  exportJobSchema,
   connectionListResponseSchema,
   loginInputSchema,
   meResponseSchema,
@@ -9,16 +9,18 @@ import {
   profileUpdateSchema,
   registerInputSchema,
   sessionListResponseSchema,
-  type AccountExport,
+  telemetryEventSchema,
   type AuthTokens,
   type ConnectionListResponse,
   type DeleteAccount,
+  type ExportJob,
   type LoginInput,
   type MeResponse,
   type PasswordChange,
   type ProfileUpdate,
   type RegisterInput,
   type SessionListResponse,
+  type TelemetryEvent,
 } from "@focus/contracts";
 import type { HttpClient } from "../http/client";
 
@@ -41,7 +43,11 @@ export type AuthApi = {
   readonly requestPasswordReset: (email: string) => Promise<void>;
   readonly confirmPasswordReset: (token: string, password: string) => Promise<void>;
   readonly deleteAccount: (input: DeleteAccount) => Promise<void>;
-  readonly exportAccount: () => Promise<AccountExport>;
+  // RF-71 : l'export est un job asynchrone, le lien arrive au statut READY.
+  readonly requestExport: () => Promise<ExportJob>;
+  readonly exportJob: (id: string) => Promise<ExportJob>;
+  // RF-72 : sans consentement, le serveur ignore l'événement (204).
+  readonly telemetry: (event: TelemetryEvent) => Promise<void>;
 };
 
 // `publicHttp` ne porte aucun jeton (login/register/refresh/reset), et
@@ -98,6 +104,17 @@ export function createAuthApi(
     deleteAccount: (input) =>
       authenticatedHttp.delete("/me", NO_CONTENT, undefined, input),
 
-    exportAccount: () => authenticatedHttp.get("/me/export", accountExportSchema),
+    requestExport: () =>
+      authenticatedHttp.post("/me/export", {}, exportJobSchema),
+
+    exportJob: (id) =>
+      authenticatedHttp.get(`/me/export/${id}`, exportJobSchema),
+
+    telemetry: (event) =>
+      authenticatedHttp.post(
+        "/telemetry/events",
+        telemetryEventSchema.parse(event),
+        NO_CONTENT,
+      ),
   };
 }

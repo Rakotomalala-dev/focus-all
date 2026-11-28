@@ -3,7 +3,6 @@ import { JwtService } from "@nestjs/jwt";
 import { Prisma } from "@prisma/client";
 import { createHash, randomBytes } from "node:crypto";
 import {
-  accountExportSchema,
   connectionListResponseSchema,
   deleteAccountSchema,
   loginInputSchema,
@@ -16,7 +15,6 @@ import {
   refreshInputSchema,
   registerInputSchema,
   sessionListResponseSchema,
-  type AccountExport,
   type AuthTokens,
   type ConnectionListResponse,
   type MeResponse,
@@ -379,6 +377,7 @@ export class AuthService {
         timeFormat: true,
         theme: true,
         quickAddParsingEnabled: true,
+        telemetryEnabled: true,
         memberships: {
           select: {
             role: true,
@@ -403,6 +402,7 @@ export class AuthService {
       timeFormat: user.timeFormat,
       theme: user.theme,
       quickAddParsingEnabled: user.quickAddParsingEnabled,
+      telemetryEnabled: user.telemetryEnabled,
       workspaces: user.memberships.map((membership) => ({
         id: membership.workspace.id,
         name: membership.workspace.name,
@@ -414,6 +414,12 @@ export class AuthService {
 
   async me(auth: AuthContext): Promise<MeResponse> {
     return this.loadMe(auth.userId);
+  }
+
+  // Utilisé par l'export asynchrone (RF-71), qui n'a pas de contexte de
+  // workspace : le snapshot ne contient que l'identité et les espaces.
+  async meForUser(userId: string): Promise<MeResponse> {
+    return this.loadMe(userId);
   }
 
   async updateProfile(auth: AuthContext, rawBody: unknown): Promise<MeResponse> {
@@ -435,6 +441,9 @@ export class AuthService {
       ...(parsed.data.quickAddParsingEnabled === undefined
         ? {}
         : { quickAddParsingEnabled: parsed.data.quickAddParsingEnabled }),
+      ...(parsed.data.telemetryEnabled === undefined
+        ? {}
+        : { telemetryEnabled: parsed.data.telemetryEnabled }),
     };
     const updated = await this.prisma.user.updateMany({
       where: { id: auth.userId, deletedAt: null },
@@ -612,30 +621,6 @@ export class AuthService {
         error instanceof Error ? error.message : undefined,
       );
     }
-  }
-
-  // Export minimal proposé avant suppression (RF-06). Il est synchrone : les
-  // exports asynchrones de RF-71 restent hors périmètre.
-  async exportAccount(auth: AuthContext): Promise<AccountExport> {
-    const me = await this.loadMe(auth.userId);
-    const workspaceIds = me.workspaces.map((workspace) => workspace.id);
-    const [projects, tasks] = await Promise.all([
-      this.prisma.project.findMany({
-        where: { workspaceId: { in: workspaceIds } },
-        orderBy: { createdAt: "asc" },
-      }),
-      this.prisma.task.findMany({
-        where: { workspaceId: { in: workspaceIds } },
-        orderBy: { createdAt: "asc" },
-      }),
-    ]);
-
-    return accountExportSchema.parse({
-      exportedAt: new Date().toISOString(),
-      user: me,
-      projects,
-      tasks,
-    });
   }
 
   async listSessions(auth: AuthContext): Promise<SessionListResponse> {

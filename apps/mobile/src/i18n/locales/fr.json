@@ -60,6 +60,7 @@
       "on": "Activé",
       "off": "Désactivé"
     },
+    "telemetryHint": "Désactivée par défaut. Aucun identifiant de compte n'est envoyé, et vous pouvez la couper à tout moment.",
     "fields": {
       "displayName": "Nom affiché",
       "avatarUrl": "URL de l'avatar",
@@ -69,6 +70,7 @@
       "weekStart": "Début de semaine",
       "timeFormat": "Format d'heure",
       "quickAddParsing": "Analyse de la saisie rapide",
+      "telemetry": "Télémétrie anonyme",
       "theme": "Thème",
       "currentPassword": "Mot de passe actuel",
       "newPassword": "Nouveau mot de passe",
@@ -123,7 +125,10 @@
     "danger": {
       "title": "Zone sensible",
       "export": "Exporter mes données",
-      "exported": "Export généré.",
+      "exportPreparing": "Export en préparation. Le lien sera valable 24 h.",
+      "downloadExport": "Télécharger l'export (24 h)",
+      "exportExpired": "Ce lien a expiré. Relancez un export.",
+      "exportFailed": "L'export n'a pas pu être préparé.",
       "exportError": "Export impossible pour le moment.",
       "deleteHint": "La suppression désactive immédiatement le compte. Les données sont purgées définitivement après 30 jours.",
       "delete": "Supprimer définitivement mon compte"

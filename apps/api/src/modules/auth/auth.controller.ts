@@ -11,7 +11,6 @@ import {
   Req,
 } from "@nestjs/common";
 import type {
-  AccountExport,
   AuthTokens,
   ConnectionListResponse,
   MeResponse,
@@ -131,10 +130,5 @@ export class MeController {
   @HttpCode(204)
   deleteMe(@CurrentAuth() auth: AuthContext, @Body() body: unknown): Promise<void> {
     return this.auth.deleteAccount(auth, body);
-  }
-
-  @Get("me/export")
-  exportMe(@CurrentAuth() auth: AuthContext): Promise<AccountExport> {
-    return this.auth.exportAccount(auth);
   }
 }

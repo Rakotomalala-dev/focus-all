@@ -801,9 +801,12 @@ Codes applicatifs stables : `VALIDATION_ERROR`, `UNAUTHENTICATED`, `SESSION_EXPI
 | `GET` | `/auth/connections` | dernières connexions par famille |
 | `GET` | `/auth/oauth/:provider` | démarrage du flux OAuth (V1.1) |
 | `GET` | `/me` | profil + préférences + workspaces |
-| `PATCH` | `/me` | profil et préférences (nom, avatar, fuseau, langue, semaine, heure, thème) |
+| `PATCH` | `/me` | profil et préférences (nom, avatar, fuseau, langue, semaine, heure, thème, télémétrie opt-in) |
 | `DELETE` | `/me` | suppression de compte (soft + purge différée à 30 jours) |
-| `GET` | `/me/export` | export JSON synchrone des données du compte |
+| `POST` | `/me/export` | démarre un export JSON asynchrone (202) |
+| `GET` | `/me/export/:id` | statut du job et lien signé quand `READY` |
+| `GET` | `/me/export/:id/download` | téléchargement par jeton signé, valable 24 h |
+| `POST` | `/telemetry/events` | événement anonyme, ignoré sans consentement (204) |
 | `GET` | `/workspaces` | liste des workspaces de l'utilisateur |
 | `GET` | `/workspaces/:id` | détail + membres |
 | `POST` | `/workspaces/:id/invitations` | invitation (V1.3) |

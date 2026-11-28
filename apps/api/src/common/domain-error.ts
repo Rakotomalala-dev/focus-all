@@ -40,6 +40,10 @@ type DomainErrorParams = {
   readonly "auth.invalid_reset_token": undefined;
   readonly "auth.session_not_found": undefined;
   readonly "auth.current_password_invalid": undefined;
+  readonly "export.not_found": undefined;
+  readonly "export.not_ready": undefined;
+  readonly "export.expired": undefined;
+  readonly "export.invalid_link": undefined;
 };
 
 export type DomainErrorKey = keyof DomainErrorParams;
@@ -87,6 +91,10 @@ const CATALOG: Readonly<
   "auth.invalid_reset_token": { code: "REQUEST_REJECTED", status: 400 },
   "auth.session_not_found": { code: "NOT_FOUND", status: 404 },
   "auth.current_password_invalid": { code: "REQUEST_REJECTED", status: 400 },
+  "export.not_found": { code: "NOT_FOUND", status: 404 },
+  "export.not_ready": { code: "REQUEST_REJECTED", status: 409 },
+  "export.expired": { code: "REQUEST_REJECTED", status: 410 },
+  "export.invalid_link": { code: "FORBIDDEN", status: 403 },
 };
 
 // Erreur typée du domaine : le service lève, le filtre problem+json traduit en

@@ -6,6 +6,12 @@ import { useSessionStore } from "./session-store";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
 
+// Les liens signés renvoyés par l'API sont relatifs (`/api/v1/...`) : le client
+// les résout avec l'origine de sa propre configuration.
+export function resolveApiUrl(path: string): string {
+  return new URL(path, API_BASE_URL).toString();
+}
+
 export const publicHttp = createHttpClient({
   baseUrl: API_BASE_URL,
   platform: Platform.OS,

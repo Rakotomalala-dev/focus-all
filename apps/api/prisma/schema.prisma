@@ -93,6 +93,8 @@ model User {
   theme           ThemePreference @default(SYSTEM)
   // RF-20 : l'analyse de la saisie rapide reste désactivable.
   quickAddParsingEnabled Boolean @default(true)
+  // RF-72 : télémétrie strictement opt-in, désactivée par défaut.
+  telemetryEnabled Boolean @default(false)
   emailVerifiedAt DateTime? @db.Timestamptz(3)
   // Suppression logique (RF-06) : la purge physique intervient 30 jours plus
   // tard via `pnpm --filter @focus/api db:purge`.
@@ -103,6 +105,7 @@ model User {
 
   sessions  Session[]
   devices   Device[]
+  exportJobs ExportJob[]
   notificationPreference NotificationPreference?
   passwordResetTokens PasswordResetToken[]
   memberships WorkspaceMember[]
@@ -325,6 +328,44 @@ model Device {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// RF-71 : file persistante des exports de compte. Le worker réclame une ligne
+// PENDING de façon atomique, puis stocke le JSON jusqu'à expiration (24 h).
+enum ExportStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+  EXPIRED
+}
+
+model ExportJob {
+  id          String       @id @db.Uuid
+  userId      String       @db.Uuid
+  status      ExportStatus @default(PENDING)
+  payload     Json?
+  error       String?      @db.VarChar(500)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  startedAt   DateTime?    @db.Timestamptz(3)
+  completedAt DateTime?    @db.Timestamptz(3)
+  expiresAt   DateTime?    @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+// RF-72 : événements anonymes. Aucune colonne userId/workspaceId/IP : le
+// consentement est vérifié avant l'écriture, l'identité n'est jamais stockée.
+model TelemetryEvent {
+  id         String   @id @db.Uuid
+  name       String   @db.VarChar(64)
+  properties Json?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([name, createdAt])
 }
 
 // RF-50/RF-51 : préférences de notification, une ligne par utilisateur.

@@ -60,6 +60,7 @@
       "on": "On",
       "off": "Off"
     },
+    "telemetryHint": "Off by default. No account identifier is sent, and you can turn it off at any time.",
     "fields": {
       "displayName": "Display name",
       "avatarUrl": "Avatar URL",
@@ -69,6 +70,7 @@
       "weekStart": "Week starts on",
       "timeFormat": "Time format",
       "quickAddParsing": "Quick add parsing",
+      "telemetry": "Anonymous telemetry",
       "theme": "Theme",
       "currentPassword": "Current password",
       "newPassword": "New password",
@@ -123,7 +125,10 @@
     "danger": {
       "title": "Danger zone",
       "export": "Export my data",
-      "exported": "Export generated.",
+      "exportPreparing": "Export is being prepared. The link will be valid for 24 hours.",
+      "downloadExport": "Download export (24 h)",
+      "exportExpired": "This link has expired. Start a new export.",
+      "exportFailed": "The export could not be prepared.",
       "exportError": "Export is not possible right now.",
       "deleteHint": "Deleting disables the account immediately. Data is permanently purged after 30 days.",
       "delete": "Permanently delete my account"

@@ -115,6 +115,8 @@ export const meResponseSchema = z.object({
   timeFormat: timeFormatSchema,
   theme: themePreferenceSchema,
   quickAddParsingEnabled: z.boolean(),
+  // RF-72 : opt-in explicite, désactivé par défaut.
+  telemetryEnabled: z.boolean(),
   workspaces: z.array(meWorkspaceSchema),
 });
 
@@ -132,6 +134,7 @@ export const profileUpdateSchema = z
     timeFormat: timeFormatSchema.optional(),
     theme: themePreferenceSchema.optional(),
     quickAddParsingEnabled: z.boolean().optional(),
+    telemetryEnabled: z.boolean().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "Aucun champ à mettre à jour.",
@@ -197,14 +200,3 @@ export const connectionListResponseSchema = z.object({
 });
 
 export type ConnectionListResponse = z.output<typeof connectionListResponseSchema>;
-
-// Export minimal proposé avant suppression (RF-06). L'export complet
-// asynchrone de RF-71 reste un chantier distinct.
-export const accountExportSchema = z.object({
-  exportedAt: z.string().datetime(),
-  user: meResponseSchema,
-  projects: z.array(z.unknown()),
-  tasks: z.array(z.unknown()),
-});
-
-export type AccountExport = z.output<typeof accountExportSchema>;

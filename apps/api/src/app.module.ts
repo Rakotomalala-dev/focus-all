@@ -3,6 +3,8 @@ import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { AppConfigModule } from "./config/app-config.module";
 import { ProblemDetailsFilter } from "./common/problem-details.filter";
 import { DatabaseModule } from "./database/database.module";
+import { ExportsModule } from "./modules/exports/exports.module";
+import { TelemetryModule } from "./modules/telemetry/telemetry.module";
 import { AuthGuard } from "./modules/auth/auth.guard";
 import { AuthModule } from "./modules/auth/auth.module";
 import { HealthModule } from "./modules/health/health.module";
@@ -18,6 +20,8 @@ import { ViewsModule } from "./modules/views/views.module";
     AppConfigModule,
     DatabaseModule,
     AuthModule,
+    ExportsModule,
+    TelemetryModule,
     HealthModule,
     ProjectsModule,
     RemindersModule,

@@ -58,6 +58,25 @@ export function useChangePassword() {
   });
 }
 
-export function useExportAccount() {
-  return useMutation({ mutationFn: () => authApi.exportAccount() });
+export function useRequestExport() {
+  return useMutation({ mutationFn: () => authApi.requestExport() });
+}
+
+// Polling court pendant la préparation ; le serveur ne conserve le lien que
+// 24 h, et `READY` est terminal côté client.
+export function useExportJob(id: string | null) {
+  return useQuery({
+    queryKey: ["auth", "export", id] as const,
+    enabled: id !== null,
+    queryFn: () => {
+      if (id === null) {
+        throw new Error("export id missing");
+      }
+      return authApi.exportJob(id);
+    },
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "PENDING" || status === "PROCESSING" ? 2_000 : false;
+    },
+  });
 }

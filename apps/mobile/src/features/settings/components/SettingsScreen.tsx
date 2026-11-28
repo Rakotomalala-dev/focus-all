@@ -5,10 +5,10 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
-  Share,
   TextInput,
   View,
 } from "react-native";
@@ -16,10 +16,12 @@ import { NotificationsSection } from "../../notifications";
 import { OfflineDataSection } from "../../offline";
 import { useDeleteAccount, useSession } from "../../auth/api/use-auth";
 import { appErrorMessageKey } from "../../../data/http/app-error";
+import { resolveApiUrl } from "../../../data/auth/auth-instance";
 import {
   useChangePassword,
   useConnections,
-  useExportAccount,
+  useExportJob,
+  useRequestExport,
   useRevokeAllSessions,
   useRevokeSession,
   useSessions,
@@ -69,7 +71,7 @@ function Choice<T extends string>({ label, value, options, onChange }: ChoicePro
               key={option.value}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              accessibilityLabel={option.label}
+              accessibilityLabel={`${label}: ${option.label}`}
               onPress={() => {
                 onChange(option.value);
               }}
@@ -105,7 +107,7 @@ export function SettingsScreen() {
   const connections = useConnections();
   const revokeSession = useRevokeSession();
   const revokeAll = useRevokeAllSessions();
-  const exportAccount = useExportAccount();
+  const requestExport = useRequestExport();
   const deleteAccount = useDeleteAccount();
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
@@ -115,7 +117,9 @@ export function SettingsScreen() {
   const [newPassword, setNewPassword] = useState("");
   const [deletionPassword, setDeletionPassword] = useState("");
   const [deletionConfirmation, setDeletionConfirmation] = useState("");
-  const [exportHint, setExportHint] = useState<string | null>(null);
+  const [exportJobId, setExportJobId] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportJob = useExportJob(exportJobId);
 
   if (user === null) {
     return (
@@ -146,31 +150,29 @@ export function SettingsScreen() {
       | { locale: "fr" | "en" }
       | { weekStartsOn: WeekStart }
       | { timeFormat: TimeFormat }
-      | { quickAddParsingEnabled: boolean },
+      | { quickAddParsingEnabled: boolean }
+      | { telemetryEnabled: boolean },
   ): void {
     update.mutate(input);
   }
 
   async function exportData(): Promise<void> {
-    setExportHint(null);
+    setExportError(null);
     try {
-      const data = await exportAccount.mutateAsync();
-      const message = JSON.stringify(data, null, 2);
-      if (Platform.OS === "web") {
-        const blob = new Blob([message], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = `focus-export-${data.exportedAt.slice(0, 10)}.json`;
-        anchor.click();
-        URL.revokeObjectURL(url);
-      } else {
-        await Share.share({ message });
-      }
-      setExportHint(t("settings.danger.exported"));
+      const job = await requestExport.mutateAsync();
+      setExportJobId(job.id);
     } catch {
-      setExportHint(t("settings.danger.exportError"));
+      setExportError(t("settings.danger.exportError"));
     }
+  }
+
+  async function downloadExport(path: string): Promise<void> {
+    const absolute = resolveApiUrl(path);
+    if (Platform.OS === "web") {
+      window.location.assign(absolute);
+      return;
+    }
+    await Linking.openURL(absolute);
   }
 
   return (
@@ -290,6 +292,18 @@ export function SettingsScreen() {
               savePreference({ timeFormat });
             }}
           />
+          <Choice
+            label={t("settings.fields.telemetry")}
+            value={user.telemetryEnabled ? "ON" : "OFF"}
+            options={[
+              { value: "ON" as const, label: t("settings.toggle.on") },
+              { value: "OFF" as const, label: t("settings.toggle.off") },
+            ]}
+            onChange={(value) => {
+              savePreference({ telemetryEnabled: value === "ON" });
+            }}
+          />
+          <AppText tone="muted">{t("settings.telemetryHint")}</AppText>
           <Choice
             label={t("settings.fields.theme")}
             value={user.theme}
@@ -420,12 +434,30 @@ export function SettingsScreen() {
         <Section title={t("settings.danger.title")}>
           <Action
             label={t("settings.danger.export")}
-            pending={exportAccount.isPending}
+            pending={requestExport.isPending}
             onPress={() => {
               void exportData();
             }}
           />
-          {exportHint === null ? null : <AppText tone="muted">{exportHint}</AppText>}
+          {exportJob.data?.status === "PENDING" || exportJob.data?.status === "PROCESSING" ? (
+            <AppText tone="muted">{t("settings.danger.exportPreparing")}</AppText>
+          ) : null}
+          {exportJob.data?.status === "READY" && exportJob.data.downloadUrl !== null ? (
+            <Action
+              label={t("settings.danger.downloadExport")}
+              pending={false}
+              onPress={() => {
+                void downloadExport(exportJob.data?.downloadUrl ?? "");
+              }}
+            />
+          ) : null}
+          {exportJob.data?.status === "EXPIRED" ? (
+            <AppText tone="muted">{t("settings.danger.exportExpired")}</AppText>
+          ) : null}
+          {exportJob.data?.status === "FAILED" ? (
+            <AppText tone="muted">{t("settings.danger.exportFailed")}</AppText>
+          ) : null}
+          {exportError === null ? null : <AppText tone="muted">{exportError}</AppText>}
 
           <AppText tone="muted">{t("settings.danger.deleteHint")}</AppText>
           <TextInput

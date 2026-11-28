@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
-  accountExportSchema,
   authTokensSchema,
+  exportJobSchema,
   connectionListResponseSchema,
   meResponseSchema,
   problemDetailsSchema,
@@ -351,11 +351,15 @@ describe("RF-06 — export et suppression de compte", () => {
     });
     expect(created.status).toBe(201);
 
-    const exported = await api.request("/api/v1/me/export", { headers });
-    expect(exported.status).toBe(200);
-    const data = accountExportSchema.parse(exported.body);
-    expect(data.user.email).toBe(email);
-    expect(data.tasks).toHaveLength(1);
+    // RF-71 : l'export est désormais un job ; RF-06 vérifie qu'il est proposé.
+    const started = await api.request("/api/v1/me/export", { method: "POST", headers });
+    expect(started.status).toBe(202);
+    const job = exportJobSchema.parse(started.body);
+    expect(job.status).toBe("PENDING");
+
+    const status = await api.request(`/api/v1/me/export/${job.id}`, { headers });
+    expect(status.status).toBe(200);
+    expect(exportJobSchema.parse(status.body).status).toBe("PENDING");
   });
 
   it("exige une confirmation forte puis supprime logiquement le compte", async () => {
