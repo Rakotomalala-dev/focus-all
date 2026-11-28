@@ -367,6 +367,12 @@
       "cancel": "Annuler",
       "save": "Enregistrer",
       "dueDatePlaceholder": "AAAA-MM-JJ",
+      "shortcuts": {
+        "TODAY": "Aujourd'hui",
+        "TOMORROW": "Demain",
+        "WEEKEND": "Ce week-end",
+        "NEXT_MONDAY": "Lundi prochain"
+      },
       "fields": {
         "title": "Titre",
         "description": "Description",

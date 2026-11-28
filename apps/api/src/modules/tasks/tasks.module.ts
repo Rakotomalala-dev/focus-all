@@ -6,12 +6,21 @@ import { PrismaTaskRepository } from "./prisma-task.repository";
 import { TASK_REPOSITORY } from "./task.repository";
 import { TasksController } from "./tasks.controller";
 import { TasksService } from "./tasks.service";
+import {
+  TRASH_PURGE_STORE,
+  PrismaTrashPurgeStore,
+  TrashPurgeService,
+  TrashPurgeWorker,
+} from "./trash-purge.service";
 
 @Module({
   imports: [ProjectsModule, TagsModule, RemindersModule],
   controllers: [TasksController],
   providers: [
     TasksService,
+    TrashPurgeService,
+    TrashPurgeWorker,
+    { provide: TRASH_PURGE_STORE, useClass: PrismaTrashPurgeStore },
     // Le service dépend du port, pas de l'implémentation : les tests unitaires
     // injectent le repository en mémoire, la production utilise PostgreSQL.
     { provide: TASK_REPOSITORY, useClass: PrismaTaskRepository },

@@ -367,6 +367,12 @@
       "cancel": "Cancel",
       "save": "Save",
       "dueDatePlaceholder": "YYYY-MM-DD",
+      "shortcuts": {
+        "TODAY": "Today",
+        "TOMORROW": "Tomorrow",
+        "WEEKEND": "This weekend",
+        "NEXT_MONDAY": "Next Monday"
+      },
       "fields": {
         "title": "Title",
         "description": "Description",

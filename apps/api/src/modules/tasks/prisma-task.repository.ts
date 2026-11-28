@@ -23,10 +23,6 @@ function toDateOnly(value: string): Date {
   return new Date(`${value}T00:00:00.000Z`);
 }
 
-function todayUtc(): Date {
-  return new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
-}
-
 function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
@@ -104,6 +100,14 @@ function cursorWhere(sort: TaskSort, after: TaskCursor): Prisma.TaskWhereInput {
 @Injectable()
 export class PrismaTaskRepository implements TaskRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  async userTimezone(userId: string): Promise<string> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { timezone: true },
+    });
+    return user?.timezone ?? "UTC";
+  }
 
   private transaction<T>(
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
@@ -603,7 +607,7 @@ export class PrismaTaskRepository implements TaskRepository {
     }
 
     if (filters.due !== undefined) {
-      const today = todayUtc();
+      const today = toDateOnly(filters.today ?? new Date().toISOString().slice(0, 10));
       if (filters.due === "NONE") {
         where.dueDate = null;
       } else if (filters.due === "OVERDUE") {

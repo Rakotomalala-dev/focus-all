@@ -4,6 +4,7 @@ import { Test } from "@nestjs/testing";
 import { PrismaClient } from "@prisma/client";
 import { AppModule } from "../../src/app.module";
 import { AccountPurgeService } from "../../src/modules/auth/account-purge.service";
+import { TrashPurgeService, type TrashPurgeCounts } from "../../src/modules/tasks/trash-purge.service";
 import { ExportService } from "../../src/modules/exports/export.service";
 import { APP_ENV } from "../../src/config/app-config.module";
 import type { Env } from "../../src/config/env.schema";
@@ -63,6 +64,8 @@ export type TestApi = {
   readonly processExports: () => Promise<number>;
   // Force la purge des comptes échus à la date donnée (RF-06).
   readonly purgeAccounts: (now: Date) => Promise<number>;
+  // Force la purge de la corbeille d'un workspace à la date donnée (RF-29).
+  readonly purgeTrash: (workspaceId: string, now: Date) => Promise<TrashPurgeCounts>;
   readonly close: () => Promise<void>;
 };
 
@@ -140,6 +143,7 @@ export async function startTestApi(): Promise<TestApi> {
   const prisma = new PrismaClient();
   const exportService = app.get(ExportService);
   const accountPurge = app.get(AccountPurgeService);
+  const trashPurge = app.get(TrashPurgeService);
   const workspaceIds: string[] = [];
   const userIds: string[] = [];
 
@@ -174,6 +178,9 @@ export async function startTestApi(): Promise<TestApi> {
         // passent par le vrai hachage Argon2id.
         passwordHash: "test-account-without-login",
         displayName: label,
+        // Les attentes d'intégration sont en date civile UTC : le fuseau est
+        // explicite plutôt que dépendant du défaut de production.
+        timezone: "UTC",
       },
     });
     await prisma.workspace.create({
@@ -238,6 +245,7 @@ export async function startTestApi(): Promise<TestApi> {
     mailbox,
     processExports: () => exportService.processPending(),
     purgeAccounts: (now) => accountPurge.purgeExpired(now),
+    purgeTrash: (workspaceId, now) => trashPurge.purgeExpired(now, workspaceId),
     close,
   };
 }

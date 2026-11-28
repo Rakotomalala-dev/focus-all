@@ -11,6 +11,9 @@ const WEEKDAYS: Readonly<Record<string, number>> = {
   SA: 6,
 };
 
+// RF-28 : une série ne génère jamais plus de 500 occurrences à la demande.
+export const MAX_RECURRENCE_OCCURRENCES = 500;
+
 type Rule = {
   readonly freq: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
   readonly interval: number;
@@ -129,6 +132,28 @@ function nextWeeklyFixed(date: Date, rule: Rule): Date {
   return new Date(date.getTime() + 7 * rule.interval * 24 * 60 * 60 * 1000);
 }
 
+// En mode AFTER_COMPLETION, l'intervalle part de la date de complétion :
+// une tâche hebdomadaire terminée un mercredi revient le mercredi suivant.
+function nextAfterCompletion(date: Date, rule: Rule): Date {
+  if (rule.freq === "DAILY") {
+    return new Date(date.getTime() + rule.interval * 24 * 60 * 60 * 1000);
+  }
+  if (rule.freq === "WEEKLY") {
+    return new Date(date.getTime() + rule.interval * 7 * 24 * 60 * 60 * 1000);
+  }
+  if (rule.freq === "MONTHLY") {
+    return addMonths(date, rule.interval);
+  }
+  return clampAnnual(date, rule.interval);
+}
+
+function clampAnnual(date: Date, years: number): Date {
+  const year = date.getUTCFullYear() + years;
+  const month = date.getUTCMonth();
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, Math.min(date.getUTCDate(), lastDay)));
+}
+
 function nextFixed(date: Date, rule: Rule): Date {
   if (rule.freq === "DAILY") {
     return new Date(date.getTime() + rule.interval * 24 * 60 * 60 * 1000);
@@ -139,9 +164,7 @@ function nextFixed(date: Date, rule: Rule): Date {
   if (rule.freq === "MONTHLY") {
     return nextMonthly(date, rule);
   }
-  return new Date(
-    Date.UTC(date.getUTCFullYear() + rule.interval, date.getUTCMonth(), date.getUTCDate()),
-  );
+  return clampAnnual(date, rule.interval);
 }
 
 /**
@@ -156,6 +179,8 @@ export function nextOccurrence(
   completedOn: string,
 ): string {
   const rule = parseRule(rrule);
-  const base = fromIsoDate(mode === "FIXED" ? previousDueDate : completedOn);
-  return toIsoDate(nextFixed(base, rule));
+  if (mode === "AFTER_COMPLETION") {
+    return toIsoDate(nextAfterCompletion(fromIsoDate(completedOn), rule));
+  }
+  return toIsoDate(nextFixed(fromIsoDate(previousDueDate), rule));
 }

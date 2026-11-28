@@ -730,13 +730,13 @@ erDiagram
 
 | Convention | Règle |
 |---|---|
-| Suppression | **Soft delete** (`deletedAt`) sur `Task` et `Project` ; purge définitive après **30 jours** par le job quotidien `AccountPurgeWorker` (au démarrage puis toutes les 24 h), avec `pnpm --filter @focus/api db:purge` comme repli pour un ordonnanceur externe. Le soft delete produit un `SyncChange` de type `DELETE` (tombstone). |
+| Suppression | **Soft delete** (`deletedAt`) sur `Task` et `Project` ; purge définitive après **30 jours** par le job quotidien `TrashPurgeWorker` (au démarrage puis toutes les 24 h), avec `pnpm --filter @focus/api db:purge` comme repli pour un ordonnanceur externe. Le soft delete produit un `SyncChange` de type `DELETE` (tombstone). |
 | Ordre | `sortOrder numeric` (pas `integer`) : insertion entre deux éléments = moyenne des voisins ; renormalisation périodique par job. |
 | Multi-tenant | Toute table métier porte `workspaceId` (dénormalisé même quand `projectId` suffirait) pour permettre les index et les requêtes de sync par workspace |
 | Index | `(workspaceId, deletedAt)`, `(workspaceId, projectId, status, sortOrder)`, `(workspaceId, dueDate)`, GIN sur `searchVector` alimenté par `focus_unaccent(title || ' ' || coalesce(description,''))` |
 | Timestamps | `createdAt` / `updatedAt` en `timestamptz` ; `updatedAt` mis à jour par Prisma (`@updatedAt`) — jamais par le client |
 | Version | `version int` incrémenté à chaque écriture serveur (verrou optimiste) |
-| Récurrence | `recurrenceRule` stocke une chaîne **RRULE RFC 5545** (ex. `FREQ=WEEKLY;BYDAY=MO,WE;INTERVAL=1`), `recurrenceMode` ∈ `FIXED` (même horaire) / `AFTER_COMPLETION` |
+| Récurrence | `recurrenceRule` stocke une chaîne **RRULE RFC 5545** (ex. `FREQ=WEEKLY;BYDAY=MO,WE;INTERVAL=1`), `recurrenceMode` ∈ `FIXED` (même horaire) / `AFTER_COMPLETION` (intervalle depuis la complétion). Une série génère au plus **500** occurrences à la demande, sans rattrapage en cascade. |
 
 ### 9.4 Choix de modélisation à valider
 

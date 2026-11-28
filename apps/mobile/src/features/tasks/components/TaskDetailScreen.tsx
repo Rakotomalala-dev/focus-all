@@ -36,8 +36,15 @@ import {
   useUpdateTask,
 } from "../api/use-tasks";
 import type { TaskPatchInput } from "../../../data/tasks/task-repository";
+import { dateShortcut, type DateShortcut } from "../utils/date-shortcuts";
 
 type RecurrencePreset = "NONE" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+const DATE_SHORTCUTS: readonly DateShortcut[] = [
+  "TODAY",
+  "TOMORROW",
+  "WEEKEND",
+  "NEXT_MONDAY",
+];
 const RECURRENCE_PRESETS: readonly RecurrencePreset[] = [
   "NONE",
   "DAILY",
@@ -317,6 +324,19 @@ function TaskEditForm({ task }: { readonly task: Task }) {
           ))}
         </View>
 
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.xs }}>
+          {DATE_SHORTCUTS.map((shortcut) => {
+            const value = dateShortcut(shortcut);
+            return (
+              <Choice
+                key={shortcut}
+                label={t(`tasks.detail.shortcuts.${shortcut}`)}
+                selected={dueDate === value}
+                onPress={() => setDueDate(value)}
+              />
+            );
+          })}
+        </View>
         <View style={{ flexDirection: "row", gap: theme.spacing.sm, flexWrap: "wrap" }}>
           <Field label={t("tasks.detail.fields.dueDate")} value={dueDate} onChangeText={setDueDate} placeholder="2026-12-01" />
           <Field label={t("tasks.detail.fields.dueTime")} value={dueTime} onChangeText={setDueTime} placeholder="09:30" />

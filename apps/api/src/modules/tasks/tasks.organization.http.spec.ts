@@ -15,6 +15,7 @@ import {
 
 let api: TestApi;
 let authorization = "";
+let workspaceId = "";
 
 function request(
   path: string,
@@ -43,7 +44,9 @@ async function list(query = "") {
 
 beforeAll(async () => {
   api = await startTestApi();
-  authorization = await api.bearerToken(await api.createWorkspace("tasks-organization"));
+  const workspace = await api.createWorkspace("tasks-organization");
+  workspaceId = workspace.workspaceId;
+  authorization = await api.bearerToken(workspace);
 });
 
 afterAll(async () => {
@@ -86,6 +89,16 @@ describe("RF-20/21/25/26 — métadonnées complètes et filtres", () => {
 
     const byText = await list(`?q=reviser`);
     expect(byText.items.map((task) => task.title)).toContain("Réviser le dossier");
+
+    // RF-27 : la description participe à la recherche, accents neutralisés.
+    const byDescription = await list(`?q=important`);
+    expect(byDescription.items.map((task) => task.title)).toContain("Réviser le dossier");
+
+    // Les filtres se combinent après le classement : texte + priorité + tag.
+    const combined = await list(
+      `?q=${encodeURIComponent("Réviser")}&priority=HIGH&tagIds=${admin.id}`,
+    );
+    expect(combined.items.map((task) => task.title)).toEqual(["Réviser le dossier"]);
 
     const byPriority = await list(`?priority=HIGH`);
     expect(byPriority.items.every((task) => task.priority === "HIGH")).toBe(true);
@@ -256,6 +269,37 @@ describe("RF-28/29 — récurrence et corbeille", () => {
     const restore = await request(`/api/v1/tasks/${task.id}/restore`, { method: "POST" });
     expect(restore.status).toBe(200);
     expect((await request(`/api/v1/tasks/${task.id}`)).status).toBe(200);
+  });
+
+  it("purge définitivement la corbeille au-delà de 30 jours", async () => {
+    const task = await createTask({ title: "À purger" });
+    const removed = await request(`/api/v1/tasks/${task.id}?version=${task.version}`, {
+      method: "DELETE",
+    });
+    expect(removed.status).toBe(204);
+
+    const project = await createProject("Projet à purger");
+    const removedProject = await request(
+      `/api/v1/projects/${project.id}?version=${project.version}`,
+      { method: "DELETE" },
+    );
+    expect(removedProject.status).toBe(204);
+
+    const counts = await api.purgeTrash(
+      workspaceId,
+      new Date(Date.now() + 31 * 24 * 60 * 60 * 1000),
+    );
+    expect(counts.tasks).toBeGreaterThanOrEqual(1);
+    expect(counts.projects).toBeGreaterThanOrEqual(1);
+
+    const trash = (await request("/api/v1/tasks/trash")).body as {
+      tasks: readonly { id: string }[];
+      projects: readonly { id: string }[];
+    };
+    expect(trash.tasks.some((item) => item.id === task.id)).toBe(false);
+    expect(trash.projects.some((item) => item.id === project.id)).toBe(false);
+    expect((await request(`/api/v1/tasks/${task.id}`)).status).toBe(404);
+    expect((await request(`/api/v1/projects/${project.id}`)).status).toBe(404);
   });
 });
 

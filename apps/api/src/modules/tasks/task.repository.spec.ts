@@ -95,6 +95,30 @@ describe("InMemoryTaskRepository.list (keyset)", () => {
     expect(second.items.map((item) => item.id)).toEqual([ID_C]);
   });
 
+  it("applique la date civile du fuseau utilisateur aux filtres d'échéance", async () => {
+    const repository = InMemoryTaskRepository.withTasks([
+      { ...task(ID_A, "000001"), dueDate: "2026-11-28" },
+      { ...task(ID_B, "000002"), dueDate: "2026-11-29" },
+    ]);
+
+    // À 23 h 30 UTC le 28, il est déjà le 29 à Paris : la tâche du 28 est en retard.
+    const overdue = await repository.list(
+      { due: "OVERDUE", today: "2026-11-29" },
+      WORKSPACE,
+      { limit: 10 },
+      "MANUAL",
+    );
+    const dueToday = await repository.list(
+      { due: "TODAY", today: "2026-11-29" },
+      WORKSPACE,
+      { limit: 10 },
+      "MANUAL",
+    );
+
+    expect(overdue.items.map((item) => item.id)).toEqual([ID_A]);
+    expect(dueToday.items.map((item) => item.id)).toEqual([ID_B]);
+  });
+
   it("signale hasMore sans compter la collection entière", async () => {
     const repository = InMemoryTaskRepository.withTasks(THREE_TASKS);
 

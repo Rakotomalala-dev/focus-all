@@ -19,9 +19,10 @@ import {
   type ViewCard,
 } from "@focus/contracts";
 import { DomainError } from "../../common/domain-error";
+import { localDateIn } from "../../common/local-date";
 import { describeIssues } from "../../common/zod-issues";
 import type { AuthContext } from "../auth/auth-context";
-import { nextOccurrence } from "../tasks/recurrence";
+import { MAX_RECURRENCE_OCCURRENCES, nextOccurrence } from "../tasks/recurrence";
 import { TASK_REPOSITORY, priorityRank, type TaskRepository } from "../tasks/task.repository";
 import { VIEWS_REPOSITORY, type ViewTaskRow, type ViewsRepository } from "./views.repository";
 
@@ -29,10 +30,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 function isoDay(date: Date): string {
   return date.toISOString().slice(0, 10);
-}
-
-function todayIso(): string {
-  return isoDay(new Date());
 }
 
 function parseDay(value: string): Date {
@@ -157,7 +154,8 @@ export class ViewsService {
     if (!parsed.success) {
       throw new BadRequestException(describeIssues(parsed.error.issues));
     }
-    const date = parsed.data.date ?? todayIso();
+    const today = localDateIn(await this.tasks.userTimezone(auth.userId));
+    const date = parsed.data.date ?? today;
     const horizon = addDays(date, UPCOMING_DAYS - 1);
 
     const rows = await this.views.tasksForWindow(auth.workspaceId, date, horizon);
@@ -218,7 +216,8 @@ export class ViewsService {
     if (!parsed.success) {
       throw new BadRequestException(describeIssues(parsed.error.issues));
     }
-    const from = parsed.data.date ?? todayIso();
+    const from =
+      parsed.data.date ?? localDateIn(await this.tasks.userTimezone(auth.userId));
     const to = addDays(from, UPCOMING_DAYS - 1);
 
     const rows = await this.views.tasksForWindow(auth.workspaceId, from, to);
@@ -255,7 +254,8 @@ export class ViewsService {
     if (!parsed.success) {
       throw new BadRequestException(describeIssues(parsed.error.issues));
     }
-    const anchor = parsed.data.anchor ?? todayIso();
+    const anchor =
+      parsed.data.anchor ?? localDateIn(await this.tasks.userTimezone(auth.userId));
     const { from, to } =
       parsed.data.mode === "MONTH" ? monthRange(anchor) : weekRange(anchor);
 
@@ -285,7 +285,7 @@ export class ViewsService {
       if (card === undefined) continue;
 
       let current = task.dueDate;
-      for (let step = 0; step < 400; step += 1) {
+      for (let step = 0; step < MAX_RECURRENCE_OCCURRENCES; step += 1) {
         const next = nextOccurrence(task.recurrenceRule, current, "FIXED", current);
         if (next <= current || next > to) break;
         current = next;

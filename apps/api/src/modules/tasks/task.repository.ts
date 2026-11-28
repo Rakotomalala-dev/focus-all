@@ -39,6 +39,8 @@ export type TaskFilters = {
   readonly due?: DueFilter;
   readonly q?: string;
   readonly includeCompleted?: boolean;
+  // Date civile du jour dans le fuseau de l'utilisateur (RF-25).
+  readonly today?: string;
 };
 
 // Clé de tri d'une tâche : le curseur transporte la valeur de tri et l'id,
@@ -98,6 +100,8 @@ export type MutationOptions = {
 };
 
 export interface TaskRepository {
+  // Fuseau IANA du propriétaire, pour les frontières de dates civiles.
+  userTimezone(userId: string): Promise<string>;
   create(draft: TaskDraft, workspaceId: string, options?: MutationOptions): Promise<Task>;
   findById(id: string, workspaceId: string): Promise<Task | undefined>;
   list(
@@ -238,6 +242,11 @@ export function isAfterCursor(task: Task, cursor: TaskCursor): boolean {
 export class InMemoryTaskRepository implements TaskRepository {
   private readonly tasks = new Map<string, StoredTask>();
   private sequence = 0;
+
+  async userTimezone(_userId: string): Promise<string> {
+    // Les tests unitaires restent déterministes et indépendants de la machine.
+    return "UTC";
+  }
 
   static withTasks(seed: readonly StoredTask[]): InMemoryTaskRepository {
     const repository = new InMemoryTaskRepository();
@@ -537,7 +546,7 @@ export class InMemoryTaskRepository implements TaskRepository {
     page: TaskPage,
     sort: TaskSort,
   ): Promise<TaskPageResult> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = filters.today ?? new Date().toISOString().slice(0, 10);
     const inSevenDays = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
       .toISOString()
       .slice(0, 10);

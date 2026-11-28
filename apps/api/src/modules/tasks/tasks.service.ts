@@ -15,6 +15,7 @@ import {
   type TrashResponse,
 } from "@focus/contracts";
 import { DomainError } from "../../common/domain-error";
+import { localDateIn } from "../../common/local-date";
 import { describeIssues } from "../../common/zod-issues";
 import type { AuthContext } from "../auth/auth-context";
 import { PROJECT_REPOSITORY, type ProjectRepository } from "../projects/project.repository";
@@ -434,7 +435,9 @@ export class TasksService {
 
     const { cursor, limit, status, priority, projectId, inbox, parentId, tagIds, due, q, includeCompleted, sort } =
       parsed.data;
+    const today = due === undefined ? undefined : localDateIn(await this.tasks.userTimezone(auth.userId));
     const filters: TaskFilters = {
+      ...(today === undefined ? {} : { today }),
       ...(status === undefined ? {} : { status }),
       ...(priority === undefined ? {} : { priority }),
       ...(projectId === undefined ? {} : { projectId }),
